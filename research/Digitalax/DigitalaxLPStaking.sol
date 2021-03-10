@@ -24,7 +24,8 @@ contract DigitalaxLPStaking  {
     IERC20 public rewardsToken;
     address public lpToken; // Pool tokens for MONA/WETH pair
     IWETH public WETH;
-
+    
+    //SSS: check this out again:
     DigitalaxAccessControls public accessControls;
     IDigitalaxRewards public rewardsContract;
 
@@ -102,7 +103,7 @@ contract DigitalaxLPStaking  {
             zapEth();
         }
     }
-
+    ///SSS: Check this again
     /// @notice Wrapper function zapEth() for UI 
     function zapEth() 
         public 
@@ -111,6 +112,7 @@ contract DigitalaxLPStaking  {
         uint256 startBal = IERC20(lpToken).balanceOf(address(this));
         addLiquidityETHOnly(address(this));
         uint256 endBal = IERC20(lpToken).balanceOf(address(this));
+        }
 
         require(
             endBal > startBal ,
@@ -186,7 +188,7 @@ contract DigitalaxLPStaking  {
     {
         return stakers[_user].balance;
     }
-
+    ///SSS: Check This Again
     /// @dev Get the total ETH staked in Uniswap
     function stakedEthTotal()
         external
