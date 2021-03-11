@@ -32,7 +32,7 @@ contract GazeLPStaking{
     // Bonus muliplier for early rewards makers.
     uint256 public bonusMultiplier;
 
-    IGazeRewards public rewardsContract;
+    //IGazeRewards public rewardsContract;
 
     uint256 constant pointMultiplier = 10e32;
 
@@ -95,7 +95,7 @@ contract GazeLPStaking{
 
     
 
-    function setRewardsContract(address _addr) 
+ /*    function setRewardsContract(address _addr) 
         external
     {
         require(_addr !=address(0));
@@ -104,9 +104,9 @@ contract GazeLPStaking{
 
         emit RewardsTokenUpdated(oldAddr, _addr);
     }
-
+ */
     
-    
+    //Implement Access Control
     function setLPToken(address _addr) 
         external 
     {
@@ -117,7 +117,7 @@ contract GazeLPStaking{
     }
 
    
-   
+       //Implement Access Control
     function setTokensClaimable(bool _enabled)
         external
     {
