@@ -17,8 +17,6 @@ contract GazeLPStaking{
 
 /// SSS: CHECK THIS OUT
     uint256 public stakedLPTotal;
-    uint256 public lastUpdateTime;
-    uint256 public rewardsPerTokenPoints;
     uint256 public totalUnclaimedRewards;
     
     //uint256 lpAllocPoint;
@@ -72,6 +70,10 @@ contract GazeLPStaking{
     event EmergencyUnstake(address indexed user, uint256 amount);
     event RewardsTokenUpdated(address indexed oldRewardsToken, address newRewardsToken );
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
+    
+    
+    
+  
 
     constructor() public{
 
@@ -80,14 +82,15 @@ contract GazeLPStaking{
     function initLPStaking(
         IERC20 _rewardsToken,
         address _lpToken,
-        IWETH _WETH
+        IWETH _WETH,
+        uint256 _rewardsPerBlock
     ) public 
     {
         require(!initialised, "Already initialised");
         rewardsToken = _rewardsToken;
         lpToken = _lpToken;
         WETH = _WETH;
-        lastUpdateTime = block.timestamp;
+        rewardsPerBlock = _rewardsPerBlock;
         initialised = true;
         lastRewardBlock = block.number;
         accRewardsPerToken = 0;
@@ -127,7 +130,11 @@ contract GazeLPStaking{
     }
 
     
-    
+    function setRewardsPerBlock(uint256 _rewardsPerBlock) external{
+        rewardsPerBlock = _rewardsPerBlock;
+    }
+
+
     function getStakedBalance(address _user) 
         external view 
             returns(uint256 balance)
@@ -191,9 +198,11 @@ contract GazeLPStaking{
         Staker storage staker = stakers[_user];
         require(staker.balance >= _amount, "withdraw: not good");
         updateRewardPool(_user);
-        uint256 pending = staker.balance.mul(accRewardsPerToken).div(1e12).sub(staker.rewardDebt);
+        uint256 pending = staker.balance.mul(accRewardsPerToken).div(1e18).sub(staker.rewardDebt);
+
         if(pending > 0) {
             require(tokensClaimable == true,"Tokens cannnot be claimed yet");
+            
             safeRewardsTransfer(msg.sender, pending);
         }
 
@@ -232,10 +241,12 @@ contract GazeLPStaking{
         }
 
         uint256 lpRewards = getLPRewards(lastRewardBlock, block.number);
+        
         uint256 rewardsAccum = lpRewards.mul(rewardsPerBlock);
-
-        accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e12).div(lpSupply));
+        accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
         lastRewardBlock = block.number;
+
+        
        /*  if (devPercentage > 0) {
             tips = tips.add(rewardsAccum.mul(devPercentage).div(1000));
         } */
@@ -248,7 +259,7 @@ contract GazeLPStaking{
         returns(uint256)
     {   
 
-        uint256 rewards = stakers[_user].balance.mul(accRewardsPerToken).div(1e12);
+        uint256 rewards = stakers[_user].balance.mul(accRewardsPerToken).div(1e18);
     }
 
     function getLPRewards(uint256 _from, uint256 _to) public view returns (uint256) {
@@ -266,14 +277,12 @@ contract GazeLPStaking{
     function safeRewardsTransfer(address _to, uint256 _amount) internal {
         uint256 rewardsBal = rewardsToken.balanceOf(address(this));
         if (_amount > rewardsBal) {
-            IERC20(rewardsToken).safeTransferFrom(
-                address(this),
+            IERC20(rewardsToken).safeTransfer(
                 _to,
                 rewardsBal
             );
         } else {
-              IERC20(rewardsToken).safeTransferFrom(
-                address(this),
+              IERC20(rewardsToken).safeTransfer(
                 _to,
                 _amount
             );
