@@ -3,7 +3,6 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./DigitalaxAccessControls.sol";
 import "./DigitalaxGenesisNFT.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IERC20.sol";

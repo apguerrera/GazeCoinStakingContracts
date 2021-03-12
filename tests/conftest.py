@@ -5,13 +5,18 @@ import pytest
 from brownie import Contract
 from settings import *
 
+@pytest.fixture(scope='module', autouse=True)
+def btts_lib(BTTSLib):
+    btts_lib = BTTSLib.deploy({'from': accounts[0]})
+    return btts_lib
 
 @pytest.fixture(scope='module', autouse=True)
-def gaze_coin(FixedToken):
-    gaze_coin = FixedToken.deploy({"from":accounts[0]})
-    name = "Gaze Coin"
-    symbol = "GAC"
-    gaze_coin.initToken(name, symbol, GAZE_TOTAL_TOKENS,{"from": accounts[0]})
+def gaze_coin(BTTSToken, btts_lib):
+    name = "GazeCoin Metaverse Token"
+    symbol = "GZE"
+    owner = accounts[0]
+    initialSupply = 29000000 * 10 ** 18
+    gaze_coin = BTTSToken.deploy(owner,symbol, name, 18, initialSupply, False, True, {"from":owner})
 
     return gaze_coin
 
