@@ -57,7 +57,7 @@ def gaze_stake_lp(GazeLPStaking,gaze_coin,rewards_contract,lp_token,weth_token,a
     
     
     assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION * TENPOW18
-    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token, 1,access_controls,{"from":accounts[0]})
+    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token, 1,access_controls,len(chain),{"from":accounts[0]})
 
     gaze_stake_lp.setTokensClaimable(True,{"from":accounts[0]})
     gaze_stake_lp.setRewardsContract(rewards_contract,{"from":accounts[0]})

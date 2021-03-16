@@ -18,7 +18,7 @@ contract GazeRewards {
     uint256 public LPBonusEndBlock;
     uint256 public LPBonusMultiplier;
 
-    GazeStaking lpStaking;
+ //   GazeStaking lpStaking;
 
     constructor(
         GazeAccessControls _accessControls

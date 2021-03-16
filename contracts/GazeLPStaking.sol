@@ -35,6 +35,8 @@ contract GazeLPStaking{
 
     uint256 constant pointMultiplier = 10e32;
     
+    uint256 public startBlock;
+
     GazeAccessControls public accessControls;
     struct Staker {
         uint256 balance;
@@ -77,7 +79,8 @@ contract GazeLPStaking{
         address _lpToken,
         IWETH _WETH,
         uint256 _rewardsPerBlock,
-        GazeAccessControls _accessControls
+        GazeAccessControls _accessControls,
+        uint256 _startBlock
     ) public 
     {
         require(!initialised, "Already initialised");
@@ -87,9 +90,9 @@ contract GazeLPStaking{
         rewardsPerBlock = _rewardsPerBlock;
         //check Last Rewards Block
         accessControls = _accessControls;
-        lastRewardBlock = block.number;
+        startBlock = _startBlock;
         accRewardsPerToken = 0;
-        
+        lastRewardBlock = block.number > _startBlock ? block.number : _startBlock;
         initialised = true;
     }
     
@@ -262,6 +265,24 @@ contract GazeLPStaking{
         } */
         
     }
+
+    function emergencyUnstake()
+        external 
+    {
+        Staker storage staker = stakers[msg.sender];
+        uint256 amount = staker.balance;
+        staker.balance = 0;
+        staker.rewardDebt = 0;
+        uint256 tokenBal = IERC20(lpToken).balanceOf(address(this));
+
+        if(amount > tokenBal){
+            IERC20(lpToken).safeTransfer(address(msg.sender), tokenBal);
+        }else {
+            IERC20(lpToken).safeTransfer(address(msg.sender),amount);
+        }
+        
+    }
+
 
     function totalRewardsOwing(address _user)
         public
