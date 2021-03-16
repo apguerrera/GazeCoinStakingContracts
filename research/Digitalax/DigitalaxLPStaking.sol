@@ -326,7 +326,6 @@ contract DigitalaxLPStaking  {
         
         lastUpdateTime = block.timestamp;
         uint256 rewards = rewardsOwing(_user);
-
         Staker storage staker = stakers[_user];
         if (_user != address(0)) {
             staker.rewardsEarned = staker.rewardsEarned.add(rewards);

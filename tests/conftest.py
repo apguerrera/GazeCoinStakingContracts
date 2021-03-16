@@ -5,6 +5,13 @@ import pytest
 from brownie import Contract
 from settings import *
 
+
+@pytest.fixture(scope='module',autouse= True)
+def access_controls(GazeAccessControls):
+    access_controls = GazeAccessControls.deploy({"from":accounts[0]}) 
+    return access_controls
+
+
 @pytest.fixture(scope='module', autouse=True)
 def btts_lib(BTTSLib):
     btts_lib = BTTSLib.deploy({'from': accounts[0]})
@@ -35,14 +42,23 @@ def lp_token(FixedToken):
 
     return lp_token
 
+@pytest.fixture(scope = 'module', autouse = True)
+def rewards_contract(GazeRewards,access_controls):
+    rewards_contract = GazeRewards.deploy(access_controls,{"from":accounts[0]})
+    return rewards_contract
+
 @pytest.fixture(scope='module', autouse=True)
-def gaze_stake_lp(GazeLPStaking,gaze_coin,lp_token,weth_token):
+def gaze_stake_lp(GazeLPStaking,gaze_coin,rewards_contract,lp_token,weth_token,access_controls):
     gaze_stake_lp = GazeLPStaking.deploy({'from':accounts[0]})
     chain.mine(5)
+    
     gaze_coin.approve(gaze_stake_lp,ONE_MILLION * TENPOW18,{'from':accounts[0]})
     gaze_coin.transfer(gaze_stake_lp,ONE_MILLION * TENPOW18,{'from':accounts[0]})
+    
+    
     assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION * TENPOW18
-    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token, 1,{"from":accounts[0]})
+    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token, 1,access_controls,{"from":accounts[0]})
 
-    gaze_stake_lp.setTokensClaimable(True)
+    gaze_stake_lp.setTokensClaimable(True,{"from":accounts[0]})
+    gaze_stake_lp.setRewardsContract(rewards_contract,{"from":accounts[0]})
     return gaze_stake_lp

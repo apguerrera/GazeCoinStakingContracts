@@ -4,6 +4,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "../interfaces/IWETH9.sol";
 import "../interfaces/IGazeRewards.sol";
+import "./Utils/GazeAccessControls.sol";
 
 
 contract GazeLPStaking{
@@ -30,17 +31,11 @@ contract GazeLPStaking{
     // Bonus muliplier for early rewards makers.
     uint256 public bonusMultiplier;
 
-    //IGazeRewards public rewardsContract;
+    IGazeRewards public rewardsContract;
 
     uint256 constant pointMultiplier = 10e32;
-
-    /**
-    @notice Struct to track what user is staking which tokens
-    @dev balance is the current ether balance of the staker
-    @dev balance is the current rewards point snapshot
-    @dev rewardsEarned is the total reward for the staker till now
-    @dev rewardsReleased is how much reward has been paid to the staker
-    */
+    
+    GazeAccessControls public accessControls;
     struct Staker {
         uint256 balance;
         uint256 rewardsReleased;
@@ -68,12 +63,10 @@ contract GazeLPStaking{
     
     event ClaimableStatusUpdated(bool status);
     event EmergencyUnstake(address indexed user, uint256 amount);
-    event RewardsTokenUpdated(address indexed oldRewardsToken, address newRewardsToken );
+    event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken );
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
     
-    
-    
-  
+    event RewardsPerBlockUpdated(uint256 rewardsPerBlock);
 
     constructor() public{
 
@@ -83,7 +76,8 @@ contract GazeLPStaking{
         IERC20 _rewardsToken,
         address _lpToken,
         IWETH _WETH,
-        uint256 _rewardsPerBlock
+        uint256 _rewardsPerBlock,
+        GazeAccessControls _accessControls
     ) public 
     {
         require(!initialised, "Already initialised");
@@ -91,28 +85,36 @@ contract GazeLPStaking{
         lpToken = _lpToken;
         WETH = _WETH;
         rewardsPerBlock = _rewardsPerBlock;
-        initialised = true;
+        //check Last Rewards Block
+        accessControls = _accessControls;
         lastRewardBlock = block.number;
         accRewardsPerToken = 0;
+        
+        initialised = true;
     }
-
     
-
- /*    function setRewardsContract(address _addr) 
-        external
-    {
-        require(_addr !=address(0));
+    function setRewardsContract(
+        address _addr
+    ) external{
+        require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeLPStaking.setRewardsContract: Sender must be admin"
+        );
+        require(_addr != address(0));
         address oldAddr = address(rewardsContract);
-        rewardsContract = IGazeRewards(rewardsContract);
-
-        emit RewardsTokenUpdated(oldAddr, _addr);
+        rewardsContract = IGazeRewards(_addr);
+        emit RewardsContractUpdated(oldAddr, _addr);
     }
- */
-    
+
     //Implement Access Control
     function setLPToken(address _addr) 
         external 
-    {
+    {   
+
+        require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeLPStaking.setLPToken: Sender must be admin"
+        );
         require(_addr != address(0));
         address oldAddr = lpToken;
         lpToken = _addr;
@@ -124,14 +126,22 @@ contract GazeLPStaking{
     function setTokensClaimable(bool _enabled)
         external
     {
-       
+        require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeLPStaking.setTokensClaimable: Sender must be admin"
+        );
         tokensClaimable = _enabled;
         emit ClaimableStatusUpdated(_enabled);
     }
 
     
     function setRewardsPerBlock(uint256 _rewardsPerBlock) external{
+         require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeLPStaking.setRewardsPerBlock: Sender must be admin"
+        );
         rewardsPerBlock = _rewardsPerBlock;
+        emit RewardsPerBlockUpdated(_rewardsPerBlock);
     }
 
 
@@ -240,7 +250,7 @@ contract GazeLPStaking{
             return;
         }
 
-        uint256 lpRewards = getLPRewards(lastRewardBlock, block.number);
+        uint256 lpRewards = rewardsContract.LPRewards(lastRewardBlock, block.number);
         
         uint256 rewardsAccum = lpRewards.mul(rewardsPerBlock);
         accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
@@ -262,17 +272,7 @@ contract GazeLPStaking{
         uint256 rewards = stakers[_user].balance.mul(accRewardsPerToken).div(1e18);
     }
 
-    function getLPRewards(uint256 _from, uint256 _to) public view returns (uint256) {
-        if (_to <= bonusEndBlock) {
-            return _to.sub(_from).mul(bonusMultiplier);
-        } else if (_from >= bonusEndBlock) {
-            return _to.sub(_from);
-        } else {
-            return bonusEndBlock.sub(_from).mul(bonusMultiplier).add(
-                _to.sub(bonusEndBlock)
-            );
-        }
-    }
+    
     ///Accounts for dust
     function safeRewardsTransfer(address _to, uint256 _amount) internal {
         uint256 rewardsBal = rewardsToken.balanceOf(address(this));

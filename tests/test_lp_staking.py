@@ -36,3 +36,5 @@ def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
 
     assert after_stake_rewards_balance -  before_stake_rewards_balance == 500
+
+## TODO: Try staking with multiple stakers and check rewards
