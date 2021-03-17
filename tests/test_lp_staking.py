@@ -16,9 +16,7 @@ def isolation(fn_isolation):
 def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
     staking_amount = 50 * TENPOW18
-    gaze_coin.approve(lp_token_staker,ONE_MILLION * TENPOW18,{'from':accounts[0]})
-
-
+  #  gaze_coin.approve(lp_token_staker,ONE_MILLION * TENPOW18,{'from':accounts[0]})
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
 

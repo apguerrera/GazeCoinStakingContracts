@@ -5,7 +5,7 @@ from .contract_addresses import *
 def load_accounts():
     if network.show_active() == 'mainnet':
         # replace with your keys
-        accounts.load("digitalax")
+        accounts.load("Gaze")
     # add accounts if active network is goerli
     if network.show_active() in ['goerli', 'ropsten','kovan','rinkeby']:
         # 0x2A40019ABd4A61d71aBB73968BaB068ab389a636
@@ -21,13 +21,10 @@ def deploy_access_controls():
         access_control = GazeAccessControls.at(access_control_address)
     return access_control
 
-def deploy_gaze_coin():
+def deploy_gaze_coin(name, symbol, initialSupply):
     gaze_coin_address = CONTRACTS[network.show_active()]["gaze_coin"]
     if gaze_coin_address == '':
-        name = "GazeCoin Metaverse Token"
-        symbol = "GZE"
         owner = accounts[0]
-        initialSupply = 29000000 * TENPOW18
         gaze_coin = BTTSToken.deploy(owner,symbol, name, 18, initialSupply, False, True, {"from":owner})
     else:
         gaze_coin = BTTSToken.at(gaze_coin_address)
@@ -65,5 +62,15 @@ def deploy_rewards_contract():
         rewards_contract = GazeRewards.at(rewards_contract_address)
     return rewards_contract
 
-#TODO deploy GazeLPStaking contract
-    
+
+def deploy_gaze_staking(gaze_coin,lp_token,weth_token,rewards_per_block,access_control,start_block):
+    gaze_staking_address = CONTRACTS[network.show_active()]["gaze_staking"]
+    if gaze_staking_address == "":
+        gaze_staking = GazeLPStaking.deploy({"from":accounts[0]})
+    else:
+        gaze_staking = GazeLPStaking.at(gaze_staking_address)
+    return gaze_staking
+
+def deploy_btts_lib():
+    btts_lib = BTTSLib.deploy({'from': accounts[0]})
+    return btts_lib
