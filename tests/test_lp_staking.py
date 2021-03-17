@@ -29,12 +29,22 @@ def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     assert before_stake_lp_balance - after_stake_lp_balance  == staking_amount
     chain.mine(500)
 
-    tx = gaze_stake_lp.updateRewardPool(lp_token_staker)
-
+    unstaking_amount = 25 * TENPOW18
     before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
-    tx = gaze_stake_lp.unstake(staking_amount, {"from":lp_token_staker})
+    tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
+   
     after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
 
     assert after_stake_rewards_balance -  before_stake_rewards_balance == 500
+
+    chain.mine(500)
+
+
+    before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+    tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
+   
+    after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+    assert after_stake_rewards_balance -  before_stake_rewards_balance == 500
+    #assert after_stake_rewards_balance -  before_stake_rewards_balance == 500
 
 ## TODO: Try staking with multiple stakers and check rewards

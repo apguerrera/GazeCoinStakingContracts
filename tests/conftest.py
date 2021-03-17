@@ -45,6 +45,7 @@ def lp_token(FixedToken):
 @pytest.fixture(scope = 'module', autouse = True)
 def rewards_contract(GazeRewards,access_controls):
     rewards_contract = GazeRewards.deploy(access_controls,{"from":accounts[0]})
+    rewards_contract.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
     return rewards_contract
 
 @pytest.fixture(scope='module', autouse=True)

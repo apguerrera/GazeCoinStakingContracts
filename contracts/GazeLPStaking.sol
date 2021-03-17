@@ -53,8 +53,6 @@ contract GazeLPStaking{
     /// @notice sets the token to be claimable or not, cannot claim if it set to false
     bool public tokensClaimable;
     bool private initialised;
-
-
     event Staked(address indexed owner, uint256 amount);
 
     /// @notice event emitted when a user has unstaked a token
@@ -147,13 +145,17 @@ contract GazeLPStaking{
         emit RewardsPerBlockUpdated(_rewardsPerBlock);
     }
 
-
-    function getStakedBalance(address _user) 
-        external view 
-            returns(uint256 balance)
+    function getStakedBalance(
+        address _user
+    )
+        external
+        view
+        returns (uint256 balance)
     {
-            return stakers[_user].balance;
+        return stakers[_user].balance;
     }
+
+
 
     function stake(uint256 _amount) 
         external
@@ -178,9 +180,9 @@ contract GazeLPStaking{
             _amount > 0,
             "GazeLPStaking._stake: Staked amount must be greater than 0"
         );
-        Staker storage staker = stakers[_user];
+        
         updateRewardPool(_user);
-
+        Staker storage staker = stakers[_user];
 
         if(_amount > 0){
             staker.balance = staker.balance.add(_amount);
@@ -209,17 +211,8 @@ contract GazeLPStaking{
 
     function _unstake(address _user, uint256 _amount) internal{
         Staker storage staker = stakers[_user];
-        require(staker.balance >= _amount, "withdraw: not good");
-        updateRewardPool(_user);
-        uint256 pending = staker.balance.mul(accRewardsPerToken).div(1e18).sub(staker.rewardDebt);
-
-        if(pending > 0) {
-            require(tokensClaimable == true,"Tokens cannnot be claimed yet");
-            
-            safeRewardsTransfer(msg.sender, pending);
-        }
-
-        
+        require(stakers[_user].balance >= _amount, "withdraw: not good");
+        claimRewards(_user);
         if(_amount>0){
              staker.balance = staker.balance.sub(_amount);
              stakedLPTotal = stakedLPTotal.sub(_amount);
@@ -254,7 +247,6 @@ contract GazeLPStaking{
         }
 
         uint256 lpRewards = rewardsContract.LPRewards(lastRewardBlock, block.number);
-        
         uint256 rewardsAccum = lpRewards.mul(rewardsPerBlock);
         accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
         lastRewardBlock = block.number;
@@ -265,7 +257,16 @@ contract GazeLPStaking{
         } */
         
     }
+    function claimRewards(address _user) public{
+        updateRewardPool(_user);
+        uint256 pending = totalRewardsOwing(_user).sub(stakers[_user].rewardDebt);
+        if(pending > 0) {
+            require(tokensClaimable == true,"Tokens cannnot be claimed yet");
+            safeRewardsTransfer(msg.sender, pending);
+        }
+    }
 
+    
     function emergencyUnstake()
         external 
     {
@@ -286,11 +287,11 @@ contract GazeLPStaking{
 
     function totalRewardsOwing(address _user)
         public
-        view
+        
         returns(uint256)
     {   
-
-        uint256 rewards = stakers[_user].balance.mul(accRewardsPerToken).div(1e18);
+        uint256 rewards =  stakers[_user].balance.mul(accRewardsPerToken).div(1e18);
+        return rewards;
     }
 
     
