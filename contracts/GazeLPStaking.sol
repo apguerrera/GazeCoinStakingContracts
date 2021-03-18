@@ -40,7 +40,6 @@ contract GazeLPStaking{
     GazeAccessControls public accessControls;
     struct Staker {
         uint256 balance;
-        uint256 rewardsReleased;
         uint256 rewardDebt;
     }
 
@@ -67,7 +66,9 @@ contract GazeLPStaking{
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
     
     event RewardsPerBlockUpdated(uint256 rewardsPerBlock);
+    //Debuging purpose
 
+    
     constructor() public{
 
     }
@@ -259,6 +260,7 @@ contract GazeLPStaking{
     }
     function claimRewards(address _user) public{
         updateRewardPool(_user);
+
         uint256 pending = totalRewardsOwing(_user).sub(stakers[_user].rewardDebt);
         if(pending > 0) {
             require(tokensClaimable == true,"Tokens cannnot be claimed yet");
@@ -311,5 +313,14 @@ contract GazeLPStaking{
         }
     }
 
+        // Returns the number of blocks remaining with the current rewards balance
+    function blocksRemaining() public returns (uint256){
+        uint256 rewardsBal = rewardsToken.balanceOf(address(this));
+        if (rewardsPerBlock > 0) {
+            return rewardsBal / rewardsPerBlock;
+        } else {
+            return 0;
+        }
+    }
 
 } 
