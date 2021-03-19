@@ -46,8 +46,9 @@ def deploy_weth_token():
 def deploy_uniswap_pool(tokenA, tokenB):
     uniswap_pool_address = CONTRACTS[network.show_active()]["lp_token"]
     if uniswap_pool_address == '':
-      #  uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
-        uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
+        uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
+        #For local development network:
+        #uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
         tx = uniswap_factory.createPair(tokenA, tokenB, {'from': accounts[0]})
         assert 'PairCreated' in tx.events
         uniswap_pool = interface.IUniswapV2Pair(web3.toChecksumAddress(tx.events['PairCreated']['pair']))

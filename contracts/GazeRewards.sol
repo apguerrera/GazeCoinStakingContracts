@@ -8,22 +8,32 @@ interface GazeStaking{
         function lpToken() external view returns (address);
         function WETH() external view returns (address);
     }
-contract GazeRewards {
-    
-    
 
+contract GazeRewards {
     using SafeMath for uint256;
     GazeAccessControls public accessControls;
 
     uint256 public LPBonusEndBlock;
     uint256 public LPBonusMultiplier;
+    uint256 public LPRewardsPerBlock;
 
- //   GazeStaking lpStaking;
-
+    event LPBonusSet(uint256 bonusEndBlock,uint256 bonusMultiplier);
+    event RewardsPerBlockUpdated(uint256 rewardsPerBlock);
     constructor(
-        GazeAccessControls _accessControls
+        GazeAccessControls _accessControls,
+        uint256 _LPRewardsPerBlock
     ) public {
         accessControls = _accessControls;
+        LPRewardsPerBlock = _LPRewardsPerBlock;
+    }
+
+    function setLPRewardsPerBlock(uint256 _LPRewardsPerBlock) external{
+         require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeRewards.setLPRewardsPerBlock: Sender must be admin"
+        );
+        LPRewardsPerBlock = _LPRewardsPerBlock;
+        emit RewardsPerBlockUpdated(_LPRewardsPerBlock);
     }
 
     function setLPBonus(
@@ -32,15 +42,19 @@ contract GazeRewards {
     ) external{
         require(
             accessControls.hasAdminRole(msg.sender),
-            "GazeLPStaking.setLPBonus: Sender must be admin"
+            "GazeRewards.setLPBonus: Sender must be admin"
         );
 
         LPBonusEndBlock = _bonusEndBlock;
         LPBonusMultiplier = _bonusMultiplier;
+        emit LPBonusSet(_bonusEndBlock,_bonusMultiplier);
     }
 
 
-    function LPRewards(uint256 _from, uint256 _to) external view returns (uint256 rewards){
+    function LPRewards(uint256 _from, uint256 _to) 
+        public 
+        view 
+        returns (uint256 rewards){
         if (_to <= LPBonusEndBlock) {
                 return _to.sub(_from).mul(LPBonusMultiplier);
             } else if (_from >= LPBonusEndBlock) {
@@ -51,4 +65,14 @@ contract GazeRewards {
                 );
             }
         }
-} 
+
+    function accumulatedLPRewards(uint256 _from, uint256 _to)
+        external 
+        view 
+        returns (uint256 rewardsAccumulated)
+    {
+        uint256 lpRewards = LPRewards(_from, _to);
+        rewardsAccumulated = lpRewards.mul(LPRewardsPerBlock);
+    } 
+
+}

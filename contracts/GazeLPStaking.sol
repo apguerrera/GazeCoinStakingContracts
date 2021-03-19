@@ -26,8 +26,8 @@ contract GazeLPStaking{
 
 
     uint256 public bonusEndBlock;
-    // Reward tokens created per block.
-    uint256 public rewardsPerBlock;
+    /* // Reward tokens created per block.
+    uint256 public rewardsPerBlock; */
     // Bonus muliplier for early rewards makers.
     uint256 public bonusMultiplier;
 
@@ -65,7 +65,7 @@ contract GazeLPStaking{
     event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken );
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
     
-    event RewardsPerBlockUpdated(uint256 rewardsPerBlock);
+    
     //Debuging purpose
 
     
@@ -77,7 +77,6 @@ contract GazeLPStaking{
         IERC20 _rewardsToken,
         address _lpToken,
         IWETH _WETH,
-        uint256 _rewardsPerBlock,
         GazeAccessControls _accessControls,
         uint256 _startBlock
     ) public 
@@ -86,7 +85,6 @@ contract GazeLPStaking{
         rewardsToken = _rewardsToken;
         lpToken = _lpToken;
         WETH = _WETH;
-        rewardsPerBlock = _rewardsPerBlock;
         //check Last Rewards Block
         accessControls = _accessControls;
         startBlock = _startBlock;
@@ -137,15 +135,7 @@ contract GazeLPStaking{
     }
 
     
-    function setRewardsPerBlock(uint256 _rewardsPerBlock) external{
-         require(
-            accessControls.hasAdminRole(msg.sender),
-            "GazeLPStaking.setRewardsPerBlock: Sender must be admin"
-        );
-        rewardsPerBlock = _rewardsPerBlock;
-        emit RewardsPerBlockUpdated(_rewardsPerBlock);
-    }
-
+  
     function getStakedBalance(
         address _user
     )
@@ -156,6 +146,20 @@ contract GazeLPStaking{
         return stakers[_user].balance;
     }
 
+
+    function pendingRewards(address _user) 
+        external 
+         
+        returns(uint256){
+            Staker storage staker = stakers[_user];
+            uint256 lpSupply = IERC20(lpToken).balanceOf(address(this));
+            if (block.number > lastRewardBlock && lpSupply != 0){
+                uint256 rewardsAccum = rewardsContract.accumulatedLPRewards(lastRewardBlock, block.number);
+                accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
+            }
+            return staker.balance.mul(accRewardsPerToken).div(1e18).sub(staker.rewardDebt);
+
+    }
 
 
     function stake(uint256 _amount) 
@@ -214,10 +218,10 @@ contract GazeLPStaking{
         Staker storage staker = stakers[_user];
         require(stakers[_user].balance >= _amount, "withdraw: not good");
         claimRewards(_user);
-        if(_amount>0){
-             staker.balance = staker.balance.sub(_amount);
-             stakedLPTotal = stakedLPTotal.sub(_amount);
-        }
+      
+        staker.balance = staker.balance.sub(_amount);
+        stakedLPTotal = stakedLPTotal.sub(_amount);
+        
         if (staker.balance == 0) {
             delete stakers[_user];
         }
@@ -247,8 +251,7 @@ contract GazeLPStaking{
             return;
         }
 
-        uint256 lpRewards = rewardsContract.LPRewards(lastRewardBlock, block.number);
-        uint256 rewardsAccum = lpRewards.mul(rewardsPerBlock);
+        uint256 rewardsAccum = rewardsContract.accumulatedLPRewards(lastRewardBlock, block.number);
         accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
         lastRewardBlock = block.number;
 
@@ -313,14 +316,15 @@ contract GazeLPStaking{
         }
     }
 
-        // Returns the number of blocks remaining with the current rewards balance
+    // Returns the number of blocks remaining with the current rewards balance
     function blocksRemaining() public returns (uint256){
         uint256 rewardsBal = rewardsToken.balanceOf(address(this));
+        uint256 rewardsPerBlock = rewardsContract.LPRewardsPerBlock();
         if (rewardsPerBlock > 0) {
             return rewardsBal / rewardsPerBlock;
         } else {
             return 0;
         }
-    }
+    } 
 
 } 
