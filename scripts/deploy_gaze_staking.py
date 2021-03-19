@@ -13,8 +13,8 @@ def main():
     lp_token = deploy_uniswap_pool(gaze_coin, weth_token)
     print("Uniswap Pool Token (LP): ", str(lp_token))
 
-    rewards = deploy_rewards_contract()
-
+    rewards = deploy_rewards_contract(access_control)
+    rewards.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
     rewards_per_block = 1
     start_block = len(chain)
 
