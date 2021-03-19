@@ -34,11 +34,11 @@ def weth_token(WETH9):
 
 @pytest.fixture(scope='module', autouse=True)
 def lp_token(FixedToken):
-    lp_token_staker = accounts[5]
-    lp_token = FixedToken.deploy({"from":lp_token_staker})
+    lp_token_deployer = accounts[5]
+    lp_token = FixedToken.deploy({"from":lp_token_deployer})
     name = "GAZE LP TOKEN"
     symbol = "GLT"
-    lp_token.initToken(name, symbol, GAZE_TOTAL_TOKENS,{"from": lp_token_staker})
+    lp_token.initToken(name, symbol, GAZE_TOTAL_TOKENS,{"from": lp_token_deployer})
 
     return lp_token
 

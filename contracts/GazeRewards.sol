@@ -18,7 +18,7 @@ contract GazeRewards {
     uint256 public LPRewardsPerBlock;
 
     event LPBonusSet(uint256 bonusEndBlock,uint256 bonusMultiplier);
-    event RewardsPerBlockUpdated(uint256 rewardsPerBlock);
+    event RewardsPerBlockUpdated(uint256 oldRewardsPerBlock, uint256 rewardsPerBlock);
     constructor(
         GazeAccessControls _accessControls,
         uint256 _LPRewardsPerBlock
@@ -27,13 +27,17 @@ contract GazeRewards {
         LPRewardsPerBlock = _LPRewardsPerBlock;
     }
 
-    function setLPRewardsPerBlock(uint256 _LPRewardsPerBlock) external{
+    function setLPRewardsPerBlock(
+        uint256 
+        _LPRewardsPerBlock
+        ) external{
          require(
             accessControls.hasAdminRole(msg.sender),
             "GazeRewards.setLPRewardsPerBlock: Sender must be admin"
         );
+        uint256 oldLPRewardsPerBlock = LPRewardsPerBlock;
         LPRewardsPerBlock = _LPRewardsPerBlock;
-        emit RewardsPerBlockUpdated(_LPRewardsPerBlock);
+        emit RewardsPerBlockUpdated(oldLPRewardsPerBlock,_LPRewardsPerBlock);
     }
 
     function setLPBonus(
@@ -52,7 +56,7 @@ contract GazeRewards {
 
 
     function LPRewards(uint256 _from, uint256 _to) 
-        public 
+        internal 
         view 
         returns (uint256 rewards){
         if (_to <= LPBonusEndBlock) {

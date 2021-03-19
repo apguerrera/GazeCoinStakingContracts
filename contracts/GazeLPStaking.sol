@@ -18,22 +18,13 @@ contract GazeLPStaking{
 
 /// SSS: CHECK THIS OUT
     uint256 public stakedLPTotal;
-    uint256 public totalUnclaimedRewards;
     
     //uint256 lpAllocPoint;
     uint256 lastRewardBlock;
     uint256 accRewardsPerToken;
 
-
-    uint256 public bonusEndBlock;
-    /* // Reward tokens created per block.
-    uint256 public rewardsPerBlock; */
-    // Bonus muliplier for early rewards makers.
-    uint256 public bonusMultiplier;
-
     IGazeRewards public rewardsContract;
 
-    uint256 constant pointMultiplier = 10e32;
     
     uint256 public startBlock;
 
@@ -46,8 +37,7 @@ contract GazeLPStaking{
     /// @notice mapping of a staker to its current properties
     mapping (address => Staker) public stakers;
 
-    // Mapping from token ID to owner address
-    mapping (uint256 => address) public tokenOwner;
+   
 
     /// @notice sets the token to be claimable or not, cannot claim if it set to false
     bool public tokensClaimable;
@@ -64,14 +54,6 @@ contract GazeLPStaking{
     event EmergencyUnstake(address indexed user, uint256 amount);
     event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken );
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
-    
-    
-    //Debuging purpose
-
-    
-    constructor() public{
-
-    }
 
     function initLPStaking(
         IERC20 _rewardsToken,
@@ -146,25 +128,26 @@ contract GazeLPStaking{
         return stakers[_user].balance;
     }
 
-
+    //for frontend
     function pendingRewards(address _user) 
         external 
+        view
          
         returns(uint256){
             Staker storage staker = stakers[_user];
             uint256 lpSupply = IERC20(lpToken).balanceOf(address(this));
+            uint256 accRewardsPerTokenHolder = accRewardsPerToken;
             if (block.number > lastRewardBlock && lpSupply != 0){
                 uint256 rewardsAccum = rewardsContract.accumulatedLPRewards(lastRewardBlock, block.number);
-                accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
+                accRewardsPerTokenHolder = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
             }
-            return staker.balance.mul(accRewardsPerToken).div(1e18).sub(staker.rewardDebt);
-
+            return staker.balance.mul(accRewardsPerTokenHolder).div(1e18).sub(staker.rewardDebt);
     }
 
 
     function stake(uint256 _amount) 
         external
-    {
+    {       
             _stake(msg.sender, _amount);
     }
                 
@@ -184,9 +167,8 @@ contract GazeLPStaking{
         require(
             _amount > 0,
             "GazeLPStaking._stake: Staked amount must be greater than 0"
-        );
-        
-        updateRewardPool(_user);
+        );    
+        updateRewardPool();
         Staker storage staker = stakers[_user];
 
         if(_amount > 0){
@@ -201,16 +183,12 @@ contract GazeLPStaking{
         }
 
         emit Staked(_user, _amount);
-
-
     }
 
 
 
     function unstake(uint256 _amount) external{
-            
-            _unstake(msg.sender, _amount);
-            
+            _unstake(msg.sender, _amount);  
     }
 
 
@@ -237,7 +215,7 @@ contract GazeLPStaking{
         emit Unstaked(_user, _amount);
     }
 
-    function updateRewardPool(address _user)
+    function updateRewardPool()
         public
     {
         if (block.number <= lastRewardBlock){
@@ -262,7 +240,7 @@ contract GazeLPStaking{
         
     }
     function claimRewards(address _user) public{
-        updateRewardPool(_user);
+        updateRewardPool();
 
         uint256 pending = totalRewardsOwing(_user).sub(stakers[_user].rewardDebt);
         if(pending > 0) {
@@ -317,7 +295,7 @@ contract GazeLPStaking{
     }
 
     // Returns the number of blocks remaining with the current rewards balance
-    function blocksRemaining() public returns (uint256){
+    function blocksRemaining() public view returns (uint256){
         uint256 rewardsBal = rewardsToken.balanceOf(address(this));
         uint256 rewardsPerBlock = rewardsContract.LPRewardsPerBlock();
         if (rewardsPerBlock > 0) {
