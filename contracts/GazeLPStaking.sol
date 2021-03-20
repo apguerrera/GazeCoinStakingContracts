@@ -2,10 +2,11 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "./Utils/GazeAccessControls.sol";
+import "./Utils/UniswapV2Library.sol";
 import "../interfaces/IWETH9.sol";
 import "../interfaces/IGazeRewards.sol";
-import "./Utils/GazeAccessControls.sol";
-
+import "../interfaces/IUniswapV2Pair.sol";
 
 contract GazeLPStaking{
     using SafeMath for uint256;
@@ -16,10 +17,8 @@ contract GazeLPStaking{
     address public lpToken;
     IWETH public WETH;
 
-/// SSS: CHECK THIS OUT
     uint256 public stakedLPTotal;
     
-    //uint256 lpAllocPoint;
     uint256 lastRewardBlock;
     uint256 accRewardsPerToken;
 
@@ -52,7 +51,7 @@ contract GazeLPStaking{
     
     event ClaimableStatusUpdated(bool status);
     event EmergencyUnstake(address indexed user, uint256 amount);
-    event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken );
+    event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken);
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
 
     function initLPStaking(
@@ -67,13 +66,44 @@ contract GazeLPStaking{
         rewardsToken = _rewardsToken;
         lpToken = _lpToken;
         WETH = _WETH;
-        //check Last Rewards Block
         accessControls = _accessControls;
         startBlock = _startBlock;
         accRewardsPerToken = 0;
         lastRewardBlock = block.number > _startBlock ? block.number : _startBlock;
         initialised = true;
     }
+    
+    receive() external payable {
+        if(msg.sender != address(WETH)){
+            zapEth();
+        }
+    }
+
+
+     /// @notice Wrapper function zapEth() for UI 
+    function zapEth() 
+        public 
+        payable
+    {
+        uint256 startBal = IERC20(lpToken).balanceOf(address(this));
+        addLiquidityETHOnly(address(this));
+        uint256 endBal = IERC20(lpToken).balanceOf(address(this));
+
+        require(
+            endBal > startBal ,
+            "GazeStaking.zapEth: Zap amount must be greater than 0"
+        );
+        uint256 amount = endBal.sub(startBal);
+        updateRewardPool();
+        Staker storage staker = stakers[msg.sender];
+
+         
+        staker.balance = staker.balance.add(amount);
+        stakedLPTotal = stakedLPTotal.add(amount);
+         
+        emit Staked(msg.sender, amount);
+    }
+
     
     function setRewardsContract(
         address _addr
@@ -171,16 +201,16 @@ contract GazeLPStaking{
         updateRewardPool();
         Staker storage staker = stakers[_user];
 
-        if(_amount > 0){
-            staker.balance = staker.balance.add(_amount);
-            stakedLPTotal = stakedLPTotal.add(_amount);
+      
+        staker.balance = staker.balance.add(_amount);
+        stakedLPTotal = stakedLPTotal.add(_amount);
 
-            IERC20(lpToken).safeTransferFrom(
-                address(_user),
-                address(this),
-                _amount
-            );
-        }
+        IERC20(lpToken).safeTransferFrom(
+            address(_user),
+            address(this),
+            _amount
+        );
+        
 
         emit Staked(_user, _amount);
     }
@@ -304,5 +334,113 @@ contract GazeLPStaking{
             return 0;
         }
     } 
+
+    function balanceOfGazeCoin() public view returns (uint256){
+        return IERC20(rewardsToken).balanceOf(address(this));
+    }
+
+
+     /* ========== Liquidity Zap ========== */
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    //
+    // LiquidityZAP - UniswapZAP
+    //   Copyright (c) 2020 deepyr.com
+    //
+    // UniswapZAP takes ETH and converts to a Uniswap liquidity tokens. 
+    //
+    // This program is free software: you can redistribute it and/or modify
+    // it under the terms of the GNU General Public License as published by
+    // the Free Software Foundation, either version 3 of the License
+    //
+    // This program is distributed in the hope that it will be useful,
+    // but WITHOUT ANY WARRANTY; without even the implied warranty of
+    // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    // GNU General Public License for more details.
+    //
+    // You should have received a copy of the GNU General Public License
+    // along with this program.  
+    // If not, see <https://github.com/apguerrera/LiquidityZAP/>.
+    //
+    // The above copyright notice and this permission notice shall be included 
+    // in all copies or substantial portions of the Software.
+    //
+    // Authors:
+    // * Adrian Guerrera / Deepyr Pty Ltd
+    // 
+    // Attribution: CORE / cvault.finance
+    //  https://github.com/cVault-finance/CORE-periphery/blob/master/contracts/COREv1Router.sol
+    // ---------------------------------------------------------------------
+    // SPDX-License-Identifier: GPL-3.0-or-later                        
+    // ---------------------------------------------------------------------
+
+    function addLiquidityETHOnly(address payable to) public payable {
+        require(to != address(0), "Invalid address");
+
+        uint256 buyAmount = msg.value.div(2);
+        require(buyAmount > 0, "Insufficient ETH amount");
+        WETH.deposit{value : msg.value}();
+
+        (uint256 reserveWeth, uint256 reserveTokens) = getPairReserves();
+        uint256 outTokens = UniswapV2Library.getAmountOut(buyAmount, reserveWeth, reserveTokens);
+        
+        WETH.transfer(lpToken, buyAmount);
+
+        (address token0, address token1) = UniswapV2Library.sortTokens(address(WETH), address(rewardsToken));
+        IUniswapV2Pair(lpToken).swap(address(rewardsToken) == token0 ? outTokens : 0, address(rewardsToken) == token1 ? outTokens : 0, address(this), "");
+
+        _addLiquidity(outTokens, buyAmount, to);
+
+    }
+
+    function _addLiquidity(uint256 tokenAmount, uint256 wethAmount, address payable to) internal {
+        (uint256 wethReserve, uint256 tokenReserve) = getPairReserves();
+
+        uint256 optimalTokenAmount = UniswapV2Library.quote(wethAmount, wethReserve, tokenReserve);
+
+        uint256 optimalWETHAmount;
+        if (optimalTokenAmount > tokenAmount) {
+            optimalWETHAmount = UniswapV2Library.quote(tokenAmount, tokenReserve, wethReserve);
+            optimalTokenAmount = tokenAmount;
+        }
+        else
+            optimalWETHAmount = wethAmount;
+
+        assert(WETH.transfer(lpToken, optimalWETHAmount));
+        assert(rewardsToken.transfer(lpToken, optimalTokenAmount));
+
+        IUniswapV2Pair(lpToken).mint(to);
+        
+        //refund dust
+        if (tokenAmount > optimalTokenAmount)
+            rewardsToken.transfer(to, tokenAmount.sub(optimalTokenAmount));
+
+        if (wethAmount > optimalWETHAmount) {
+            uint256 withdrawAmount = wethAmount.sub(optimalWETHAmount);
+            WETH.withdraw(withdrawAmount);
+            to.transfer(withdrawAmount);
+        }
+    }
+
+
+    function getLPTokenPerEthUnit(uint ethAmt) public view  returns (uint liquidity){
+        (uint256 reserveWeth, uint256 reserveTokens) = getPairReserves();
+        uint256 outTokens = UniswapV2Library.getAmountOut(ethAmt.div(2), reserveWeth, reserveTokens);
+        uint _totalSupply =  IUniswapV2Pair(lpToken).totalSupply();
+
+        (address token0, ) = UniswapV2Library.sortTokens(address(WETH), address(rewardsToken));
+        (uint256 amount0, uint256 amount1) = token0 == address(rewardsToken) ? (outTokens, ethAmt.div(2)) : (ethAmt.div(2), outTokens);
+        (uint256 _reserve0, uint256 _reserve1) = token0 == address(rewardsToken) ? (reserveTokens, reserveWeth) : (reserveWeth, reserveTokens);
+        liquidity = min(amount0.mul(_totalSupply) / _reserve0, amount1.mul(_totalSupply) / _reserve1);
+    }
+
+    function getPairReserves() internal view returns (uint256 wethReserves, uint256 tokenReserves) {
+        (address token0,) = UniswapV2Library.sortTokens(address(WETH), address(rewardsToken));
+        (uint256 reserve0, uint reserve1,) = IUniswapV2Pair(lpToken).getReserves();
+        (wethReserves, tokenReserves) = token0 == address(rewardsToken) ? (reserve1, reserve0) : (reserve0, reserve1);
+    }
+    
+    function min(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        c = a <= b ? a : b;
+    }
 
 } 

@@ -14,7 +14,7 @@ def main():
     print("Uniswap Pool Token (LP): ", str(lp_token))
 
     rewards = deploy_rewards_contract(access_control)
-    rewards.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
+    rewards.setLPBonus(len(chain)+4990,1,{"from":accounts[0]})
     rewards_per_block = 1
     start_block = len(chain)
 

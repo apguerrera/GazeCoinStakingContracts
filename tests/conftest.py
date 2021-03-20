@@ -38,28 +38,37 @@ def lp_token(FixedToken):
     lp_token = FixedToken.deploy({"from":lp_token_deployer})
     name = "GAZE LP TOKEN"
     symbol = "GLT"
-    lp_token.initToken(name, symbol, GAZE_TOTAL_TOKENS,{"from": lp_token_deployer})
+    lp_token.initToken(name, symbol, ONE_MILLION,{"from": lp_token_deployer})
 
     return lp_token
 
-@pytest.fixture(scope = 'module', autouse = True)
-def rewards_contract(GazeRewards,access_controls):
-    rewards_contract = GazeRewards.deploy(access_controls,1,{"from":accounts[0]})
-    rewards_contract.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
-    return rewards_contract
+""" @pytest.fixture(scope='module', autouse=True)
+def lp_token_from_fork(gaze_coin,weth_token,interface):
+    uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
+    tx = uniswap_factory.createPair(gaze_coin, weth_token, {'from': accounts[0]})
+    assert 'PairCreated' in tx.events
+    lp_token_from_fork = interface.IUniswapV2Pair(web3.toChecksumAddress(tx.events['PairCreated']['pair']))
+    return lp_token_from_fork """
 
 @pytest.fixture(scope='module', autouse=True)
-def gaze_stake_lp(GazeLPStaking,gaze_coin,rewards_contract,lp_token,weth_token,access_controls):
+def gaze_stake_lp(GazeLPStaking,gaze_coin,lp_token,weth_token,access_controls):
     gaze_stake_lp = GazeLPStaking.deploy({'from':accounts[0]})
-    chain.mine(5)
     
-    gaze_coin.approve(gaze_stake_lp,ONE_MILLION * TENPOW18,{'from':accounts[0]})
-    gaze_coin.transfer(gaze_stake_lp,ONE_MILLION * TENPOW18,{'from':accounts[0]})
+    gaze_coin.approve(gaze_stake_lp,ONE_MILLION ,{'from':accounts[0]})
+    gaze_coin.transfer(gaze_stake_lp,ONE_MILLION ,{'from':accounts[0]})
     
     
-    assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION * TENPOW18
-    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token,access_controls,len(chain),{"from":accounts[0]})
+    assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION
+    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token,access_controls,len(chain)+15,{"from":accounts[0]})
 
     gaze_stake_lp.setTokensClaimable(True,{"from":accounts[0]})
-    gaze_stake_lp.setRewardsContract(rewards_contract,{"from":accounts[0]})
+    
     return gaze_stake_lp
+
+
+@pytest.fixture(scope = 'module', autouse = True)
+def rewards_contract(GazeRewards,access_controls,gaze_stake_lp):
+    rewards_contract = GazeRewards.deploy(access_controls,1,gaze_stake_lp,{"from":accounts[0]})
+    rewards_contract.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
+    gaze_stake_lp.setRewardsContract(rewards_contract,{"from":accounts[0]})
+    return rewards_contract
