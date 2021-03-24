@@ -16,13 +16,13 @@ def isolation(fn_isolation):
 
 @pytest.fixture(scope='function')
 def transfer_lp_tokens_to_multiple_accounts(lp_token):
-  transfer_amount = 50
+  transfer_amount = 50 * TENPOW18
   transfer_to = accounts[4]
   owner = accounts[5]
   lp_token.approve(transfer_to,transfer_amount,{"from":owner})
   lp_token.transfer(transfer_to,transfer_amount,{"from":owner})
 
-  transfer_amount = 50
+  transfer_amount = 50 * TENPOW18
   transfer_to = accounts[6]
   owner = accounts[5]
   lp_token.approve(transfer_to,transfer_amount,{"from":owner})
@@ -31,17 +31,20 @@ def transfer_lp_tokens_to_multiple_accounts(lp_token):
 
 def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
-    staking_amount = 50
+    staking_amount = 50 * TENPOW18
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
+    
+    
     gaze_stake_lp.stake(staking_amount, {"from":lp_token_staker})
     after_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
     assert before_stake_lp_balance - after_stake_lp_balance  == staking_amount
     
     
     chain.mine(500)
-
-    unstaking_amount = 25
+    print(chain[-1].number)
+    print('lenght of chain -',len(chain))
+    unstaking_amount = 25 * TENPOW18
     before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
     tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
     after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
@@ -60,7 +63,7 @@ def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
 
 def test_staking_and_then_complete_unstaking(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
-    staking_amount = 25
+    staking_amount = 25 * TENPOW18
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
 
@@ -70,7 +73,7 @@ def test_staking_and_then_complete_unstaking(lp_token,gaze_stake_lp,gaze_coin):
 
     assert before_stake_lp_balance - after_stake_lp_balance  == staking_amount
     chain.mine(500)
-    unstaking_amount = 25 
+    unstaking_amount = 25 * TENPOW18
     before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
     tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
    
@@ -89,7 +92,7 @@ def test_multiple_staking(lp_token,gaze_stake_lp,gaze_coin,transfer_lp_tokens_to
   ###########################
 
     lp_token_staker = accounts[5]
-    staking_amount = 25
+    staking_amount = 25* TENPOW18
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
     gaze_stake_lp.stake(staking_amount, {"from":lp_token_staker})
@@ -99,7 +102,7 @@ def test_multiple_staking(lp_token,gaze_stake_lp,gaze_coin,transfer_lp_tokens_to
   ###########################
   # Staker accounts[4]
   ###########################
-    staking_amount = 50
+    staking_amount = 50 * TENPOW18
     lp_token_staker = accounts[4]
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
@@ -110,14 +113,14 @@ def test_multiple_staking(lp_token,gaze_stake_lp,gaze_coin,transfer_lp_tokens_to
 
     lp_token_staker = accounts[4]
     chain.mine(499)
-    unstaking_amount = 50
+    unstaking_amount = 50* TENPOW18
     before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
     tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
     after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
   #  assert after_stake_rewards_balance -  before_stake_rewards_balance == (math.floor(500/25) + math.floor(500/75)) * 50
 
     lp_token_staker = accounts[5]
-    unstaking_amount = 25
+    unstaking_amount = 25* TENPOW18
     before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
     tx = gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
     after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
@@ -125,7 +128,7 @@ def test_multiple_staking(lp_token,gaze_stake_lp,gaze_coin,transfer_lp_tokens_to
 
 def test_emergency_unstake(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
-    staking_amount = 50
+    staking_amount = 50* TENPOW18
     lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
     gaze_stake_lp.stake(staking_amount, {"from":lp_token_staker})
@@ -142,7 +145,7 @@ def test_emergency_unstake(lp_token,gaze_stake_lp,gaze_coin):
 
 def test_lp_staking_limited_rewards(lp_token,gaze_stake_lp_limited_rewards,gaze_coin):
     lp_token_staker = accounts[5]
-    staking_amount = 50
+    staking_amount = 50* TENPOW18
     lp_token.approve(gaze_stake_lp_limited_rewards,staking_amount,{"from":lp_token_staker})
     before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
     gaze_stake_lp_limited_rewards.stake(staking_amount, {"from":lp_token_staker})
@@ -152,7 +155,7 @@ def test_lp_staking_limited_rewards(lp_token,gaze_stake_lp_limited_rewards,gaze_
     
     chain.mine(1000)
 
-    unstaking_amount = 25
+    unstaking_amount = 25* TENPOW18
     print(gaze_stake_lp_limited_rewards.balanceOfGazeCoin())
     #with reverts("GazeRewards.accumulatedLPRewards: No rewards to distribute"):
     tx = gaze_stake_lp_limited_rewards.unstake(unstaking_amount, {"from":lp_token_staker})

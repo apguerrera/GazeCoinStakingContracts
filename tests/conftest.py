@@ -38,7 +38,7 @@ def lp_token(FixedToken):
     lp_token = FixedToken.deploy({"from":lp_token_deployer})
     name = "GAZE LP TOKEN"
     symbol = "GLT"
-    lp_token.initToken(name, symbol, ONE_MILLION,{"from": lp_token_deployer})
+    lp_token.initToken(name, symbol, ONE_MILLION * TENPOW18,{"from": lp_token_deployer})
 
     return lp_token
 
@@ -59,7 +59,8 @@ def gaze_stake_lp(GazeLPStaking,gaze_coin,lp_token,weth_token,access_controls):
     
     
     assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION
-    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token,access_controls,len(chain)+15,{"from":accounts[0]})
+    print(len(chain))
+    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token,access_controls,len(chain)+10,{"from":accounts[0]})
 
     gaze_stake_lp.setTokensClaimable(True,{"from":accounts[0]})
     
