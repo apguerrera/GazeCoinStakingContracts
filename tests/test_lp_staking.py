@@ -29,6 +29,7 @@ def transfer_lp_tokens_to_multiple_accounts(lp_token):
   lp_token.transfer(transfer_to,transfer_amount,{"from":owner})
 
 
+
 def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
     staking_amount = 50 * TENPOW18
@@ -60,6 +61,60 @@ def test_lp_staking(lp_token,gaze_stake_lp,gaze_coin):
     #assert after_stake_rewards_balance -  before_stake_rewards_balance == 500
 
 ## TODO: Try staking with multiple stakers and check rewards
+
+def test_lp_staking_multiple(lp_token,gaze_stake_lp,gaze_coin):
+    for i in range(5):
+        transfer_amount = 50 * TENPOW18
+        transfer_to = accounts[i]
+        owner = accounts[5]
+
+        lp_token.approve(transfer_to,transfer_amount,{"from":owner})
+        lp_token.transfer(transfer_to,transfer_amount,{"from":owner})
+        
+    # Staking
+    for i in range(5):
+        lp_token_staker = accounts[i]
+        staking_amount = 50 * TENPOW18
+
+        lp_token.approve(gaze_stake_lp,staking_amount,{"from":lp_token_staker})
+
+        before_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
+
+        gaze_stake_lp.stake(staking_amount, {"from":lp_token_staker})
+
+        after_stake_lp_balance = lp_token.balanceOf(lp_token_staker)
+
+        assert before_stake_lp_balance - after_stake_lp_balance  == staking_amount
+
+    chain.mine(500)
+
+    # Unstaking 1/2
+    for i in range(5):
+        lp_token_staker = accounts[i]
+        unstaking_amount = 25 * TENPOW18
+
+        before_unstake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+
+        gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
+
+        after_unstake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+
+        assert after_unstake_rewards_balance - before_unstake_rewards_balance == 100
+
+    chain.mine(500)
+
+    # Unstaking 2/2
+    for i in range(5):
+        lp_token_staker = accounts[i]
+        unstaking_amount = 25 * TENPOW18
+
+        before_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+
+        gaze_stake_lp.unstake(unstaking_amount, {"from":lp_token_staker})
+
+        after_stake_rewards_balance = gaze_coin.balanceOf(lp_token_staker)
+
+        assert after_stake_rewards_balance -  before_stake_rewards_balance == 100
 
 def test_staking_and_then_complete_unstaking(lp_token,gaze_stake_lp,gaze_coin):
     lp_token_staker = accounts[5]
