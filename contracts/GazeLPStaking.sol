@@ -3,12 +3,12 @@ pragma solidity ^0.6.12;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./Utils/GazeAccessControls.sol";
-import "./Utils/UniswapV2Library.sol";
+import "./Uniswap/UniswapV2Library.sol";
 import "../interfaces/IWETH9.sol";
 import "../interfaces/IGazeRewards.sol";
 import "../interfaces/IUniswapV2Pair.sol";
 
-contract GazeLPStaking{
+contract GazeLPStaking {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -17,26 +17,26 @@ contract GazeLPStaking{
     address public lpToken;
     IWETH public WETH;
 
-    uint256 public stakedLPTotal;
-    
-    uint256 lastRewardBlock;
-    uint256 accRewardsPerToken;
-
-    IGazeRewards public rewardsContract;
-
-    
-    uint256 public startBlock;
-
     GazeAccessControls public accessControls;
+    IGazeRewards public rewardsContract;
+    
+    uint256 public stakedLPTotal;
+    uint256 public lastUpdateTime;
+    uint256 public rewardsPerTokenPoints;
+    uint256 public totalUnclaimedRewards;
+
+    uint256 constant pointMultiplier = 10e22;
+
     struct Staker {
         uint256 balance;
-        uint256 rewardDebt;
+        uint256 lastRewardPoints;
+        uint256 rewardsEarned;
+        uint256 rewardsReleased;
     }
 
     /// @notice mapping of a staker to its current properties
     mapping (address => Staker) public stakers;
 
-   
 
     /// @notice sets the token to be claimable or not, cannot claim if it set to false
     bool public tokensClaimable;
@@ -54,12 +54,13 @@ contract GazeLPStaking{
     event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken);
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
 
+
+
     function initLPStaking(
         IERC20 _rewardsToken,
         address _lpToken,
         IWETH _WETH,
-        GazeAccessControls _accessControls,
-        uint256 _startBlock
+        GazeAccessControls _accessControls
     ) public 
     {
         require(!initialised, "Already initialised");
@@ -67,9 +68,7 @@ contract GazeLPStaking{
         lpToken = _lpToken;
         WETH = _WETH;
         accessControls = _accessControls;
-        startBlock = _startBlock;
-        accRewardsPerToken = 0;
-        lastRewardBlock = block.number > _startBlock ? block.number : _startBlock;
+        lastUpdateTime = block.timestamp;
         initialised = true;
     }
     
@@ -94,20 +93,22 @@ contract GazeLPStaking{
             "GazeStaking.zapEth: Zap amount must be greater than 0"
         );
         uint256 amount = endBal.sub(startBal);
-        updateRewardPool();
-        Staker storage staker = stakers[msg.sender];
 
-         
+        Staker storage staker = stakers[msg.sender];
+        if (staker.balance == 0 && staker.lastRewardPoints == 0 ) {
+          staker.lastRewardPoints = rewardsPerTokenPoints;
+        }
+
+        updateReward(msg.sender);
         staker.balance = staker.balance.add(amount);
         stakedLPTotal = stakedLPTotal.add(amount);
-         
         emit Staked(msg.sender, amount);
     }
 
     
-    function setRewardsContract(
-        address _addr
-    ) external{
+    function setRewardsContract(address _addr)
+        external
+    {
         require(
             accessControls.hasAdminRole(msg.sender),
             "GazeLPStaking.setRewardsContract: Sender must be admin"
@@ -122,7 +123,6 @@ contract GazeLPStaking{
     function setLPToken(address _addr) 
         external 
     {   
-
         require(
             accessControls.hasAdminRole(msg.sender),
             "GazeLPStaking.setLPToken: Sender must be admin"
@@ -158,20 +158,15 @@ contract GazeLPStaking{
         return stakers[_user].balance;
     }
 
-    //for frontend
-    function pendingRewards(address _user) 
-        external 
+    /// @dev Get the total ETH staked in Uniswap
+    function stakedEthTotal()
+        external
         view
-         
-        returns(uint256){
-            Staker storage staker = stakers[_user];
-            uint256 lpSupply = IERC20(lpToken).balanceOf(address(this));
-            uint256 accRewardsPerTokenHolder = accRewardsPerToken;
-            if (block.number > lastRewardBlock && lpSupply != 0){
-                uint256 rewardsAccum = rewardsContract.accumulatedLPRewards(lastRewardBlock, block.number);
-                accRewardsPerTokenHolder = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
-            }
-            return staker.balance.mul(accRewardsPerTokenHolder).div(1e18).sub(staker.rewardDebt);
+        returns (uint256)
+    {
+
+        uint256 lpPerEth = getLPTokenPerEthUnit(1e18);
+        return stakedLPTotal.mul(1e18).div(lpPerEth);
     }
 
 
@@ -198,20 +193,20 @@ contract GazeLPStaking{
             _amount > 0,
             "GazeLPStaking._stake: Staked amount must be greater than 0"
         );    
-        updateRewardPool();
         Staker storage staker = stakers[_user];
 
-      
+        if (staker.balance == 0 && staker.lastRewardPoints == 0 ) {
+          staker.lastRewardPoints = rewardsPerTokenPoints;
+        }
+
+        updateReward(_user);
         staker.balance = staker.balance.add(_amount);
         stakedLPTotal = stakedLPTotal.add(_amount);
-
         IERC20(lpToken).safeTransferFrom(
             address(_user),
             address(this),
             _amount
         );
-        
-
         emit Staked(_user, _amount);
     }
 
@@ -223,121 +218,144 @@ contract GazeLPStaking{
 
 
     function _unstake(address _user, uint256 _amount) internal{
+     
         Staker storage staker = stakers[_user];
-        require(stakers[_user].balance >= _amount, "withdraw: not good");
-        claimRewards(_user);
-      
+
+        require(
+            staker.balance >= _amount,
+            "DigitalaxLPStaking._unstake: Sender must have staked tokens"
+        );
+        claimReward(_user);
+        
         staker.balance = staker.balance.sub(_amount);
         stakedLPTotal = stakedLPTotal.sub(_amount);
-        
+
         if (staker.balance == 0) {
             delete stakers[_user];
         }
-        uint256 tokenBal = IERC20(lpToken).balanceOf(address(this));
 
-        if(_amount > tokenBal){
+        uint256 tokenBal = IERC20(lpToken).balanceOf(address(this));
+        if (_amount > tokenBal) {
             IERC20(lpToken).safeTransfer(address(_user), tokenBal);
-        }else {
+        } else {
             IERC20(lpToken).safeTransfer(address(_user), _amount);
         }
-
-        staker.rewardDebt = totalRewardsOwing(_user);
         emit Unstaked(_user, _amount);
     }
 
-    function updateRewardPool()
-        public
+
+    /// @notice Unstake without caring about rewards. EMERGENCY ONLY.
+    function emergencyUnstake() 
+        external
     {
-        if (block.number <= lastRewardBlock){
-            return;
-        }
+        uint256 amount = stakers[msg.sender].balance;
+        stakers[msg.sender].balance = 0;
+        stakers[msg.sender].rewardsEarned = 0;
 
-        uint256 lpSupply = IERC20(lpToken).balanceOf(address(this));
-
-        if (lpSupply == 0) {
-            lastRewardBlock = block.number;
-            return;
-        }
-
-        uint256 rewardsAccum = rewardsContract.accumulatedLPRewards(lastRewardBlock, block.number);
-        accRewardsPerToken = accRewardsPerToken.add(rewardsAccum.mul(1e18).div(lpSupply));
-        lastRewardBlock = block.number;
-
-        
-       /*  if (devPercentage > 0) {
-            tips = tips.add(rewardsAccum.mul(devPercentage).div(1000));
-        } */
-        
-    }
-    function claimRewards(address _user) public{
-        updateRewardPool();
-
-        uint256 pending = totalRewardsOwing(_user).sub(stakers[_user].rewardDebt);
-        if(pending > 0) {
-            require(tokensClaimable == true,"Tokens cannnot be claimed yet");
-            safeRewardsTransfer(msg.sender, pending);
-        }
+        IERC20(lpToken).safeTransfer(address(msg.sender), amount);
+        emit EmergencyUnstake(msg.sender, amount);
     }
 
-    
-    function emergencyUnstake()
-        external 
+
+    /// @dev Updates the amount of rewards owed for each user before any tokens are moved
+    function updateReward(
+        address _user
+    ) 
+        public 
     {
-        Staker storage staker = stakers[msg.sender];
-        uint256 amount = staker.balance;
-        staker.balance = 0;
-        staker.rewardDebt = 0;
-        uint256 tokenBal = IERC20(lpToken).balanceOf(address(this));
 
-        if(amount > tokenBal){
-            IERC20(lpToken).safeTransfer(address(msg.sender), tokenBal);
-        }else {
-            IERC20(lpToken).safeTransfer(address(msg.sender),amount);
+        rewardsContract.updateRewards();
+        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
+
+        if (stakedLPTotal > 0) {
+            rewardsPerTokenPoints = rewardsPerTokenPoints.add(lpRewards.mul(1e18)
+                        .mul(pointMultiplier)
+                        .div(stakedLPTotal));
         }
         
+        lastUpdateTime = block.timestamp;
+        uint256 rewards = rewardsOwing(_user);
+        Staker storage staker = stakers[_user];
+        if (_user != address(0)) {
+            staker.rewardsEarned = staker.rewardsEarned.add(rewards);
+            staker.lastRewardPoints = rewardsPerTokenPoints; 
+        }
     }
 
-
-    function totalRewardsOwing(address _user)
+    /// @notice Returns the rewards owing for a user
+    /// @dev The rewards are dynamic and normalised from the other pools
+    /// @dev This gets the rewards from each of the periods as one multiplier
+    function rewardsOwing(
+        address _user
+    )
         public
-        
+        view
         returns(uint256)
-    {   
-        uint256 rewards =  stakers[_user].balance.mul(accRewardsPerToken).div(1e18);
+    {
+        uint256 newRewardPerToken = rewardsPerTokenPoints.sub(stakers[_user].lastRewardPoints);
+        uint256 rewards = stakers[_user].balance.mul(newRewardPerToken)
+                                                .div(1e18)
+                                                .div(pointMultiplier);
         return rewards;
     }
 
-    
-    ///Accounts for dust
-    function safeRewardsTransfer(address _to, uint256 _amount) internal {
-        uint256 rewardsBal = rewardsToken.balanceOf(address(this));
-        if (_amount > rewardsBal) {
-            IERC20(rewardsToken).safeTransfer(
-                _to,
-                rewardsBal
-            );
-        } else {
-              IERC20(rewardsToken).safeTransfer(
-                _to,
-                _amount
-            );
-        }
-    }
 
-    // Returns the number of blocks remaining with the current rewards balance
-    function blocksRemaining() public view returns (uint256){
-        uint256 rewardsBal = rewardsToken.balanceOf(address(this));
-        uint256 rewardsPerBlock = rewardsContract.LPRewardsPerBlock();
-        if (rewardsPerBlock > 0) {
-            return rewardsBal / rewardsPerBlock;
-        } else {
+    /// @notice Returns the about of rewards yet to be claimed
+    function unclaimedRewards(
+        address _user
+    )
+        public
+        view
+        returns(uint256)
+    {
+        if (stakedLPTotal == 0) {
             return 0;
         }
-    } 
 
-    function balanceOfGazeCoin() public view returns (uint256){
-        return IERC20(rewardsToken).balanceOf(address(this));
+        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime,
+                                                        block.timestamp);
+
+        uint256 newRewardPerToken = rewardsPerTokenPoints.add(lpRewards
+                                                                .mul(1e18)
+                                                                .mul(pointMultiplier)
+                                                                .div(stakedLPTotal))
+                                                         .sub(stakers[_user].lastRewardPoints);
+
+        uint256 rewards = stakers[_user].balance.mul(newRewardPerToken)
+                                                .div(1e18)
+                                                .div(pointMultiplier);
+        return rewards.add(stakers[_user].rewardsEarned).sub(stakers[_user].rewardsReleased);
     }
+
+
+    /// @notice Lets a user with rewards owing to claim tokens
+    function claimReward(
+        address _user
+    )
+        public
+    {
+        require(
+            tokensClaimable == true,
+            "Tokens cannnot be claimed yet"
+        );
+        updateReward(_user);
+
+        Staker storage staker = stakers[_user];
+    
+        uint256 payableAmount = staker.rewardsEarned.sub(staker.rewardsReleased);
+        staker.rewardsReleased = staker.rewardsReleased.add(payableAmount);
+
+        /// @dev accounts for dust 
+        uint256 rewardBal = rewardsToken.balanceOf(address(this));
+        if (payableAmount > rewardBal) {
+            payableAmount = rewardBal;
+        }
+        
+        rewardsToken.transfer(_user, payableAmount);
+        emit RewardPaid(_user, payableAmount);
+    }
+
+
 
 
      /* ========== Liquidity Zap ========== */

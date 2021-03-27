@@ -46,9 +46,11 @@ def deploy_weth_token():
 def deploy_uniswap_pool(tokenA, tokenB):
     uniswap_pool_address = CONTRACTS[network.show_active()]["lp_token"]
     if uniswap_pool_address == '':
-        uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
         #For local development network:
-        #uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
+        if network.show_active() == 'development':
+            uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
+        else:
+            uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
         tx = uniswap_factory.createPair(tokenA, tokenB, {'from': accounts[0]})
         assert 'PairCreated' in tx.events
         uniswap_pool = interface.IUniswapV2Pair(web3.toChecksumAddress(tx.events['PairCreated']['pair']))
@@ -56,22 +58,30 @@ def deploy_uniswap_pool(tokenA, tokenB):
         uniswap_pool = interface.IUniswapV2Pair(uniswap_pool_address)
     return uniswap_pool
 
-def deploy_rewards_contract(access_control):
-    rewards_contract_address = CONTRACTS[network.show_active()]["rewards_contract"]
-    if rewards_contract_address == '':
-        rewards_contract = GazeRewards.deploy(access_control,{"from":accounts[0]})
+
+def deploy_rewards(rewards_token,lp_staking, access_control, start_time,last_time,lp_paid):
+    rewards_address = CONTRACTS[network.show_active()]["rewards_contract"]
+    if rewards_address == "":
+        rewards = GazeRewards.deploy(rewards_token,
+                                        access_control,
+                                        lp_staking,
+                                        start_time,
+                                        last_time,
+                                        lp_paid,
+                                        {'from': accounts[0]})
     else:
-        rewards_contract = GazeRewards.at(rewards_contract_address)
-    return rewards_contract
+        rewards = GazeRewards.at(rewards_address)
+    return rewards
 
 
-def deploy_gaze_staking():
-    gaze_staking_address = CONTRACTS[network.show_active()]["gaze_staking"]
-    if gaze_staking_address == "":
-        gaze_staking = GazeLPStaking.deploy({"from":accounts[0]})
+def deploy_lp_staking(rewards_token, lp_token,weth_token, access_control):
+    lp_staking_address = CONTRACTS[network.show_active()]["lp_staking"]
+    if lp_staking_address == "":
+        lp_staking = GazeLPStaking.deploy({'from': accounts[0]})
+        lp_staking.initLPStaking(rewards_token, lp_token, weth_token, access_control,{'from': accounts[0]})
     else:
-        gaze_staking = GazeLPStaking.at(gaze_staking_address)
-    return gaze_staking
+        lp_staking = GazeLPStaking.at(lp_staking_address)
+    return lp_staking
 
 def deploy_btts_lib():
     btts_lib_address = CONTRACTS[network.show_active()]["btts_lib"]

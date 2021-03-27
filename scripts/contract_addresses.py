@@ -50,7 +50,7 @@ CONTRACTS = {
          "weth":"",
          "lp_token":"",
          "rewards_contract":"",
-         "gaze_staking":"",
+         "lp_staking":"",
          "btts_lib":""
     }
 }
