@@ -3,7 +3,7 @@ pragma solidity ^0.6.12;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./Utils/GazeAccessControls.sol";
-import "./Utils/UniswapV2Library.sol";
+import "./Uniswap/UniswapV2Library.sol";
 import "../interfaces/IWETH9.sol";
 import "../interfaces/IGazeRewards.sol";
 import "../interfaces/IUniswapV2Pair.sol";

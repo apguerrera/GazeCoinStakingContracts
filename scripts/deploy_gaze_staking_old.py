@@ -13,13 +13,15 @@ def main():
     lp_token = deploy_uniswap_pool(gaze_coin, weth_token)
     print("Uniswap Pool Token (LP): ", str(lp_token))
 
-    rewards = deploy_rewards_contract(access_control)
-    rewards.setLPBonus(len(chain)+4990,1,{"from":accounts[0]})
-    rewards_per_block = 1
+    gaze_staking = deploy_gaze_staking()
+
+    rewards_contract = deploy_rewards_contract(access_control,GAZE_COIN_REWARDS_PER_BLOCK,gaze_staking)
+    rewards_contract.setLPBonus(len(chain)+4990,1,{"from":accounts[0]})
     start_block = len(chain)
 
-    gaze_staking = deploy_gaze_staking()
+
     gaze_coin.approve(gaze_staking,ONE_MILLION*TENPOW18, {'from':accounts[0]})
     gaze_coin.transfer(gaze_staking,ONE_MILLION * TENPOW18,{'from':accounts[0]})
 
-    gaze_staking.initLPStaking(gaze_coin,lp_token,weth_token,rewards_per_block,access_control,start_block,{"from":accounts[0]})
+    gaze_staking.initLPStaking(gaze_coin,lp_token,weth_token,access_control,start_block,{"from":accounts[0]})
+    gaze_staking.setRewardsContract(rewards_contract,{"from":accounts[0]})

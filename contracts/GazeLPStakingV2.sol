@@ -1,48 +1,32 @@
-// SPDX-License-Identifier: GPLv2
-
-pragma solidity 0.6.12;
+pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./DigitalaxAccessControls.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "./Utils/GazeAccessControls.sol";
 import "./Uniswap/UniswapV2Library.sol";
 import "../interfaces/IWETH9.sol";
+import "../interfaces/IGazeRewards.sol";
 import "../interfaces/IUniswapV2Pair.sol";
-import "../interfaces/IDigitalaxRewards.sol";
 
-/**
- * @title Digitalax Staking
- * @dev Stake MONA LP tokens, earn MONA on the Digitialax platform
- * @author Adrian Guerrera (deepyr)
- */
-
-
-contract DigitalaxLPStaking  {
+contract GazeLPStakingV2 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    IERC20 public rewardsToken;
-    address public lpToken; // Pool tokens for MONA/WETH pair
-    IWETH public WETH;
-    
-    //SSS: check this out again:
-    DigitalaxAccessControls public accessControls;
-    IDigitalaxRewards public rewardsContract;
 
+    IERC20 public rewardsToken;
+    address public lpToken;
+    IWETH public WETH;
+
+    GazeAccessControls public accessControls;
+    IGazeRewards public rewardsContract;
+    
     uint256 public stakedLPTotal;
     uint256 public lastUpdateTime;
     uint256 public rewardsPerTokenPoints;
     uint256 public totalUnclaimedRewards;
 
-    uint256 constant pointMultiplier = 10e32;
+    uint256 constant pointMultiplier = 10e22;
 
-    /**
-    @notice Struct to track what user is staking which tokens
-    @dev balance is the current ether balance of the staker
-    @dev balance is the current rewards point snapshot
-    @dev rewardsEarned is the total reward for the staker till now
-    @dev rewardsReleased is how much reward has been paid to the staker
-    */
     struct Staker {
         uint256 balance;
         uint256 lastRewardPoints;
@@ -53,14 +37,10 @@ contract DigitalaxLPStaking  {
     /// @notice mapping of a staker to its current properties
     mapping (address => Staker) public stakers;
 
-    // Mapping from token ID to owner address
-    mapping (uint256 => address) public tokenOwner;
 
     /// @notice sets the token to be claimable or not, cannot claim if it set to false
     bool public tokensClaimable;
     bool private initialised;
-
-    /// @notice event emitted when a user has staked a token
     event Staked(address indexed owner, uint256 amount);
 
     /// @notice event emitted when a user has unstaked a token
@@ -71,23 +51,17 @@ contract DigitalaxLPStaking  {
     
     event ClaimableStatusUpdated(bool status);
     event EmergencyUnstake(address indexed user, uint256 amount);
-    event RewardsTokenUpdated(address indexed oldRewardsToken, address newRewardsToken );
+    event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken);
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
 
-    constructor() public {
-    }
 
-     /**
-     * @dev Single gateway to intialize the staking contract after deploying
-     * @dev Sets the contract with the MONA/WETH LP pair and MONA token 
-     */
+
     function initLPStaking(
         IERC20 _rewardsToken,
         address _lpToken,
         IWETH _WETH,
-        DigitalaxAccessControls _accessControls
-    )
-        public
+        GazeAccessControls _accessControls
+    ) public 
     {
         require(!initialised, "Already initialised");
         rewardsToken = _rewardsToken;
@@ -97,14 +71,15 @@ contract DigitalaxLPStaking  {
         lastUpdateTime = block.timestamp;
         initialised = true;
     }
-
+    
     receive() external payable {
         if(msg.sender != address(WETH)){
             zapEth();
         }
     }
-    ///SSS: Check this again
-    /// @notice Wrapper function zapEth() for UI 
+
+
+     /// @notice Wrapper function zapEth() for UI 
     function zapEth() 
         public 
         payable
@@ -115,7 +90,7 @@ contract DigitalaxLPStaking  {
 
         require(
             endBal > startBal ,
-            "DigitalaxLPStaking.zapEth: Zap amount must be greater than 0"
+            "GazeStaking.zapEth: Zap amount must be greater than 0"
         );
         uint256 amount = endBal.sub(startBal);
 
@@ -130,31 +105,27 @@ contract DigitalaxLPStaking  {
         emit Staked(msg.sender, amount);
     }
 
-    /// @notice Lets admin set the Rewards Token
-    function setRewardsContract(
-        address _addr
-    )
+    
+    function setRewardsContract(address _addr)
         external
     {
         require(
             accessControls.hasAdminRole(msg.sender),
-            "DigitalaxLPStaking.setRewardsContract: Sender must be admin"
+            "GazeLPStaking.setRewardsContract: Sender must be admin"
         );
         require(_addr != address(0));
         address oldAddr = address(rewardsContract);
-        rewardsContract = IDigitalaxRewards(_addr);
-        emit RewardsTokenUpdated(oldAddr, _addr);
+        rewardsContract = IGazeRewards(_addr);
+        emit RewardsContractUpdated(oldAddr, _addr);
     }
 
-    /// @notice Lets admin set the Uniswap LP Token
-    function setLpToken(
-        address _addr
-    )
-        external
-    {
+    //Implement Access Control
+    function setLPToken(address _addr) 
+        external 
+    {   
         require(
             accessControls.hasAdminRole(msg.sender),
-            "DigitalaxLPStaking.setLpToken: Sender must be admin"
+            "GazeLPStaking.setLPToken: Sender must be admin"
         );
         require(_addr != address(0));
         address oldAddr = lpToken;
@@ -162,22 +133,21 @@ contract DigitalaxLPStaking  {
         emit LpTokenUpdated(oldAddr, _addr);
     }
 
-    /// @notice Lets admin set when tokens are claimable
-    function setTokensClaimable(
-        bool _enabled
-    )
+   
+       //Implement Access Control
+    function setTokensClaimable(bool _enabled)
         external
     {
         require(
             accessControls.hasAdminRole(msg.sender),
-            "DigitalaxLPStaking.setTokensClaimable: Sender must be admin"
+            "GazeLPStaking.setTokensClaimable: Sender must be admin"
         );
         tokensClaimable = _enabled;
         emit ClaimableStatusUpdated(_enabled);
     }
 
-    /// @notice Getter functions for Staking contract
-    /// @dev Get the tokens staked by a user
+    
+  
     function getStakedBalance(
         address _user
     )
@@ -187,7 +157,7 @@ contract DigitalaxLPStaking  {
     {
         return stakers[_user].balance;
     }
-    ///SSS: Check This Again
+
     /// @dev Get the total ETH staked in Uniswap
     function stakedEthTotal()
         external
@@ -200,28 +170,19 @@ contract DigitalaxLPStaking  {
     }
 
 
-    /// @notice Stake MONA LP Tokens and earn rewards.
-    function stake(
-        uint256 _amount
-    )
+    function stake(uint256 _amount) 
         external
-    {
-        _stake(msg.sender, _amount);
+    {       
+            _stake(msg.sender, _amount);
     }
-
-    /// @notice Stake MONA LP Tokens and earn rewards.
+                
     function stakeAll()
         external
     {
-        uint256 balance = IERC20(lpToken).balanceOf(msg.sender);
-        _stake(msg.sender, balance);
+            uint256 balance = IERC20(lpToken).balanceOf(msg.sender);
+            _stake(msg.sender, balance);
     }
 
-    /**
-     * @dev All the staking goes through this function
-     * @dev Rewards to be given out is calculated
-     * @dev Balance of stakers are updated as they stake the nfts based on ether price
-    */
     function _stake(
         address _user,
         uint256 _amount
@@ -229,9 +190,9 @@ contract DigitalaxLPStaking  {
         internal
     {
         require(
-            _amount > 0 ,
-            "DigitalaxLPStaking._stake: Staked amount must be greater than 0"
-        );
+            _amount > 0,
+            "GazeLPStaking._stake: Staked amount must be greater than 0"
+        );    
         Staker storage staker = stakers[_user];
 
         if (staker.balance == 0 && staker.lastRewardPoints == 0 ) {
@@ -249,27 +210,15 @@ contract DigitalaxLPStaking  {
         emit Staked(_user, _amount);
     }
 
-    /// @notice Unstake MONA LP Tokens. 
-    function unstake(
-        uint256 _amount
-    ) 
-        external 
-    {
-        _unstake(msg.sender, _amount);
+
+
+    function unstake(uint256 _amount) external{
+            _unstake(msg.sender, _amount);  
     }
 
-     /**
-     * @dev All the unstaking goes through this function
-     * @dev Rewards to be given out is calculated
-     * @dev Balance of stakers are updated as they unstake the nfts based on ether price
-    */
-    function _unstake(
-        address _user,
-        uint256 _amount
-    ) 
-        internal 
-    {
 
+    function _unstake(address _user, uint256 _amount) internal{
+     
         Staker storage staker = stakers[_user];
 
         require(
@@ -294,6 +243,7 @@ contract DigitalaxLPStaking  {
         emit Unstaked(_user, _amount);
     }
 
+
     /// @notice Unstake without caring about rewards. EMERGENCY ONLY.
     function emergencyUnstake() 
         external
@@ -306,6 +256,7 @@ contract DigitalaxLPStaking  {
         emit EmergencyUnstake(msg.sender, amount);
     }
 
+
     /// @dev Updates the amount of rewards owed for each user before any tokens are moved
     function updateReward(
         address _user
@@ -314,14 +265,12 @@ contract DigitalaxLPStaking  {
     {
 
         rewardsContract.updateRewards();
-        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime,
-                                                        block.timestamp);
+        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
 
         if (stakedLPTotal > 0) {
-            rewardsPerTokenPoints = rewardsPerTokenPoints.add(lpRewards
-                                                        .mul(1e18)
-                                                        .mul(pointMultiplier)
-                                                        .div(stakedLPTotal));
+            rewardsPerTokenPoints = rewardsPerTokenPoints.add(lpRewards.mul(1e18)
+                        .mul(pointMultiplier)
+                        .div(stakedLPTotal));
         }
         
         lastUpdateTime = block.timestamp;
@@ -332,7 +281,6 @@ contract DigitalaxLPStaking  {
             staker.lastRewardPoints = rewardsPerTokenPoints; 
         }
     }
-
 
     /// @notice Returns the rewards owing for a user
     /// @dev The rewards are dynamic and normalised from the other pools
@@ -407,7 +355,10 @@ contract DigitalaxLPStaking  {
         emit RewardPaid(_user, payableAmount);
     }
 
-    /* ========== Liquidity Zap ========== */
+
+
+
+     /* ========== Liquidity Zap ========== */
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     //
     // LiquidityZAP - UniswapZAP
@@ -510,5 +461,4 @@ contract DigitalaxLPStaking  {
         c = a <= b ? a : b;
     }
 
-
-}
+} 

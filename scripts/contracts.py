@@ -46,9 +46,11 @@ def deploy_weth_token():
 def deploy_uniswap_pool(tokenA, tokenB):
     uniswap_pool_address = CONTRACTS[network.show_active()]["lp_token"]
     if uniswap_pool_address == '':
-        uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
         #For local development network:
-        #uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
+        if network.show_active() == 'development':
+            uniswap_factory = UniswapV2Factory.deploy(accounts[5],{"from":accounts[0]})
+        else:
+            uniswap_factory = interface.IUniswapV2Factory(UNISWAP_FACTORY)
         tx = uniswap_factory.createPair(tokenA, tokenB, {'from': accounts[0]})
         assert 'PairCreated' in tx.events
         uniswap_pool = interface.IUniswapV2Pair(web3.toChecksumAddress(tx.events['PairCreated']['pair']))
@@ -56,10 +58,10 @@ def deploy_uniswap_pool(tokenA, tokenB):
         uniswap_pool = interface.IUniswapV2Pair(uniswap_pool_address)
     return uniswap_pool
 
-def deploy_rewards_contract(access_control):
+def deploy_rewards_contract(access_control,block_rewards,gaze_staking):
     rewards_contract_address = CONTRACTS[network.show_active()]["rewards_contract"]
     if rewards_contract_address == '':
-        rewards_contract = GazeRewards.deploy(access_control,{"from":accounts[0]})
+        rewards_contract = GazeRewards.deploy(access_control,block_rewards,gaze_staking,{"from":accounts[0]})
     else:
         rewards_contract = GazeRewards.at(rewards_contract_address)
     return rewards_contract
