@@ -223,7 +223,7 @@ contract GazeLPStaking {
 
         require(
             staker.balance >= _amount,
-            "DigitalaxLPStaking._unstake: Sender must have staked tokens"
+            "GazeLPStaking._unstake: Sender must have staked tokens"
         );
         claimReward(_user);
         

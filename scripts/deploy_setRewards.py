@@ -29,7 +29,7 @@ def main():
 
     # Get rewards contract
     rewards_address = CONTRACTS[network.show_active()]["rewards_contract"]
-    rewards = DigitalaxRewards.at(rewards_address)
+    rewards = GazeRewards.at(rewards_address)
 
     # Set Rewards
     set_rewards(rewards)
