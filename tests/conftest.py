@@ -33,12 +33,22 @@ def weth_token(WETH9):
     return weth_token
 
 @pytest.fixture(scope='module', autouse=True)
-def lp_token(FixedToken):
+def lp_factory(UniswapV2Factory):
+    
+    lp_factory = UniswapV2Factory.deploy(accounts[0], {'from': accounts[0]})
+    return lp_factory
+
+@pytest.fixture(scope='module', autouse=True)
+def lp_token(UniswapV2Pair, weth_token, gaze_coin):
     lp_token_deployer = accounts[5]
-    lp_token = FixedToken.deploy({"from":lp_token_deployer})
-    name = "GAZE LP TOKEN"
-    symbol = "GLT"
-    lp_token.initToken(name, symbol, ONE_MILLION * TENPOW18,{"from": lp_token_deployer})
+    lp_token = UniswapV2Pair.deploy({"from":lp_token_deployer})
+
+    lp_token.initialize(weth_token, gaze_coin, {"from": lp_token_deployer})
+
+    weth_token.deposit({'from': accounts[0], 'value': 1 * 10**18})
+    gaze_coin.transfer(lp_token, 100000 * 10**18, {'from':accounts[1]})
+    weth_token.transfer( lp_token,1 * 10**18,{'from':accounts[0]})
+    lp_token.mint(accounts[0],{'from':accounts[0]})
 
     return lp_token
 
@@ -76,36 +86,39 @@ def rewards_contract(GazeRewards,access_control,gaze_coin, lp_staking):
                                         0,
                                         {'from': accounts[0]})
 
-    lp_staking.setRewardsContract(rewards_contract,{"from":accounts[0]})
-    gaze_coin.approve(rewards_contract,ONE_MILLION,{"from":vault} )
-    rewards_contract.setVault(vault,{"from":accounts[0]})
-    lp_staking.setTokensClaimable(True,{"from":accounts[0]})
+
 
     return rewards_contract
 
 
 @pytest.fixture(scope='module', autouse=True)
-def staking_rewards(GazeRewards,gaze_coin,access_control,lp_staking):
-    start_time = chain.time() 
-    staking_rewards = GazeRewards.deploy(
-                gaze_coin,
-                access_control,
-                lp_staking,
-                start_time,
-                0,0,
-                {'from':accounts[0]}
-    )
+def staking_rewards(GazeLPStaking, GazeRewards, gaze_coin,lp_token,weth_token,access_control):
+    staking_rewards = GazeLPStaking.deploy({'from':accounts[0]})
+    staking_rewards.initLPStaking(gaze_coin,lp_token,weth_token,access_control,{"from":accounts[0]})
 
     vault = accounts[1]
-    gaze_coin.approve(staking_rewards,ONE_MILLION,{"from":vault} )
+    rewards_contract = GazeRewards.deploy(gaze_coin,
+                                        access_control,
+                                        staking_rewards,
+                                        chain.time() +10,
+                                        0,
+                                        0,
+                                        {'from': accounts[0]})
 
-    lp_staking.setRewardsContract(staking_rewards)
+
+    assert gaze_coin.balanceOf(vault) > 0
+    gaze_coin.approve(rewards_contract,ONE_MILLION,{"from":vault} )
+    rewards_contract.setVault(vault,{"from":accounts[0]})
+
+    staking_rewards.setRewardsContract(rewards_contract,{"from":accounts[0]})
+    staking_rewards.setTokensClaimable(True,{"from":accounts[0]})
 
     weeks = [0,1,2,3,4,5]
     rewards = [700*TENPOW18,700*TENPOW18,500*TENPOW18,350*TENPOW18,150*TENPOW18,100*TENPOW18]
-    staking_rewards.setRewards(weeks,rewards)
+    rewards_contract.setRewards(weeks,rewards)
 
-    chain.sleep(10000 +20)
+    chain.sleep(20)
     chain.mine()
 
     return staking_rewards
+

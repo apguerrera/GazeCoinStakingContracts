@@ -25,5 +25,5 @@ def main():
         print("rewards per second for week[8]=",rewards.weeklyRewardsPerSecond(8)* 14*24*60*60/TENPOW18)
 
 
-    gaze_coin.approve(rewards,ONE_MILLION*TENPOW18, {'from':accounts[0]})
+    gaze_coin.approve(rewards,ONE_MILLION, {'from':accounts[0]})
     lp_staking.setRewardsContract(rewards,{"from":accounts[0]})
