@@ -10,7 +10,7 @@ def main():
     access_control = deploy_access_controls()
     deploy_btts_lib()
     gaze_coin = deploy_gaze_coin(GAZE_COIN_NAME,GAZE_COIN_SYMBOL,GAZE_COIN_INITIAL_SUPPLY)
-
+    vault = accounts[0]
     weth_token = deploy_weth_token()
     lp_token = deploy_uniswap_pool(gaze_coin, weth_token)
     print("Uniswap Pool Token (LP): ", str(lp_token))
@@ -19,13 +19,11 @@ def main():
 
     rewards = deploy_rewards(gaze_coin, lp_staking,access_control,REWARDS_START_TIME, REWARDS_LAST_UPDATE, REWARDS_LP_PAID )
     if rewards.weeklyRewardsPerSecond(0) == 0:
-        set_bonus(lp_staking, rewards)
+        # set_bonus(lp_staking, rewards)
         set_rewards(rewards)
-        print("rewards per second for week[0] =",rewards.weeklyRewardsPerSecond(0)* 7*24*60*60 /TENPOW18)
-        print("rewards per second for week[8]=",rewards.weeklyRewardsPerSecond(8)* 7*24*60*60/TENPOW18)
+        print("rewards per second for week[0] =",rewards.weeklyRewardsPerSecond(0)* 14*24*60*60 /TENPOW18)
+        print("rewards per second for week[8]=",rewards.weeklyRewardsPerSecond(8)* 14*24*60*60/TENPOW18)
 
 
-    gaze_coin.approve(lp_staking,ONE_MILLION*TENPOW18, {'from':accounts[0]})
-    gaze_coin.transfer(lp_staking,ONE_MILLION * TENPOW18,{'from':accounts[0]})
-
+    gaze_coin.approve(rewards,ONE_MILLION*TENPOW18, {'from':accounts[0]})
     lp_staking.setRewardsContract(rewards,{"from":accounts[0]})

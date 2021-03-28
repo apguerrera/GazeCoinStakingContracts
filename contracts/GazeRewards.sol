@@ -23,14 +23,15 @@ contract GazeRewards {
     Rewards public rewardsToken;
     GazeAccessControls public accessControls;
     IGazeStaking public lpStaking;
+    address public vault;
 
-    uint256 constant pointMultiplier = 10e18;
+    uint256 constant POINT_MULTIPLIER = 10e18;
+    uint256 constant PERIOD_LENGTH = 14;
     uint256 constant SECONDS_PER_DAY = 24 * 60 * 60;
-    uint256 constant SECONDS_PER_WEEK = 7 * 24 * 60 * 60;
+    uint256 constant SECONDS_PER_PERIOD = PERIOD_LENGTH * SECONDS_PER_DAY;
     
     // weekNumber => rewards
     mapping (uint256 => uint256) public weeklyRewardsPerSecond;
-    mapping (address => mapping(uint256 => uint256)) public weeklyBonusPerSecond;
 
     uint256 public startTime;
     uint256 public lastRewardTime;
@@ -116,6 +117,18 @@ contract GazeRewards {
         lpStaking = IGazeStaking(_addr);
     } 
 
+    function setVault(
+        address _addr
+    )
+        external
+    {
+        require(
+            accessControls.hasAdminRole(msg.sender),
+            "GazeRewards.setLPStaking: Sender must be admin"
+        );
+        vault = _addr;
+    } 
+
     /// @notice Set rewards distributed each week
     /// @dev this number is the total rewards that week with 18 decimals
     function setRewards(
@@ -131,34 +144,13 @@ contract GazeRewards {
         uint256 numRewards = rewardWeeks.length;
         for (uint256 i = 0; i < numRewards; i++) {
             uint256 week = rewardWeeks[i];
-            uint256 amount = amounts[i].mul(pointMultiplier)
-                                       .div(SECONDS_PER_WEEK)
-                                       .div(pointMultiplier);
+            uint256 amount = amounts[i].mul(POINT_MULTIPLIER)
+                                       .div(SECONDS_PER_PERIOD)
+                                       .div(POINT_MULTIPLIER);
             weeklyRewardsPerSecond[week] = amount;
         }
     }
-    /// @notice Set rewards distributed each week
-    /// @dev this number is the total rewards that week with 18 decimals
-    function bonusRewards(
-        address pool,
-        uint256[] memory rewardWeeks,
-        uint256[] memory amounts
-    )
-        external
-    {
-        require(
-            accessControls.hasAdminRole(msg.sender),
-            "GazeRewards.setRewards: Sender must be admin"
-        );
-        uint256 numRewards = rewardWeeks.length;
-        for (uint256 i = 0; i < numRewards; i++) {
-            uint256 week = rewardWeeks[i];
-            uint256 amount = amounts[i].mul(pointMultiplier)
-                                       .div(SECONDS_PER_WEEK)
-                                       .div(pointMultiplier);
-            weeklyBonusPerSecond[pool][week] = amount;
-        }
-    }
+
 
     // From BokkyPooBah's DateTime Library v1.01
     // https://github.com/bokkypoobah/BokkyPooBahsDateTimeLibrary
@@ -220,7 +212,7 @@ contract GazeRewards {
         view 
         returns(uint256)
     {
-        return diffDays(startTime, block.timestamp) / 7;
+        return diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
     }
 
     function totalRewardsPaid()
@@ -242,35 +234,25 @@ contract GazeRewards {
         if (_from < startTime) {
             _from = startTime;
         }
-        uint256 fromWeek = diffDays(startTime, _from) / 7;                      
-        uint256 toWeek = diffDays(startTime, _to) / 7;                          
+        uint256 fromWeek = diffDays(startTime, _from) / PERIOD_LENGTH;                      
+        uint256 toWeek = diffDays(startTime, _to) / PERIOD_LENGTH;                          
 
         if (fromWeek == toWeek) {
-            return _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek],
-                                    _to.sub(_from),
-                                    weeklyWeightPoints[fromWeek].lpWeightPoints)
-                        .add(weeklyBonusPerSecond[address(lpStaking)][fromWeek].mul(_to.sub(_from)));
+            return _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek],_to.sub(_from));
         }
+
         /// @dev First count remainer of first week 
-        uint256 initialRemander = startTime.add((fromWeek+1).mul(SECONDS_PER_WEEK)).sub(_from);
-        rewards = _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek],
-                                    initialRemander,
-                                    weeklyWeightPoints[fromWeek].lpWeightPoints)
-                        .add(weeklyBonusPerSecond[address(lpStaking)][fromWeek].mul(initialRemander));
+        uint256 initialRemander = startTime.add((fromWeek+1).mul(SECONDS_PER_PERIOD)).sub(_from);
+        rewards = _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek], initialRemander);
 
         /// @dev add multiples of the week
         for (uint256 i = fromWeek+1; i < toWeek; i++) {
-            rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[i],
-                                    SECONDS_PER_WEEK,
-                                    weeklyWeightPoints[i].lpWeightPoints))
-                             .add(weeklyBonusPerSecond[address(lpStaking)][i].mul(SECONDS_PER_WEEK));
+            rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[i],SECONDS_PER_PERIOD));
         }
         /// @dev Adds any remaining time in the most recent week till _to
-        uint256 finalRemander = _to.sub(toWeek.mul(SECONDS_PER_WEEK).add(startTime));
-        rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[toWeek],
-                                    finalRemander,
-                                    weeklyWeightPoints[toWeek].lpWeightPoints))
-                        .add(weeklyBonusPerSecond[address(lpStaking)][toWeek].mul(finalRemander));
+        uint256 finalRemander = _to.sub(toWeek.mul(SECONDS_PER_PERIOD).add(startTime));
+        rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[toWeek],finalRemander));
+
         return rewards;
     }
 
@@ -284,14 +266,13 @@ contract GazeRewards {
         rewards = LPRewards(lastRewardTime, block.timestamp);
         if ( rewards > 0 ) {
             lpRewardsPaid = lpRewardsPaid.add(rewards);
-            require(rewardsToken.transfer(address(lpStaking), rewards));
+            require(rewardsToken.transferFrom(vault, address(lpStaking), rewards));
         }
     }
 
     function _rewardsFromPoints(
         uint256 rate,
-        uint256 duration, 
-        uint256 weight
+        uint256 duration
     ) 
         internal
         pure
@@ -337,7 +318,7 @@ contract GazeRewards {
         view
         returns(uint256)
     {
-        return diffDays(startTime, block.timestamp) / 7;
+        return diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
     }
 
     function getCurrentLpWeightPoints()
@@ -345,7 +326,7 @@ contract GazeRewards {
         view
         returns(uint256)
     {
-        uint256 currentWeek = diffDays(startTime, block.timestamp) / 7;
+        uint256 currentWeek = diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
         return weeklyWeightPoints[currentWeek].lpWeightPoints;
     }
 
@@ -366,10 +347,16 @@ contract GazeRewards {
         if ( stakedEth == 0 ) {
             return 0;
         }
+        /// @dev hours per year x 100 = 876600
         uint256 rewards = LPRewards(block.timestamp - 3600, block.timestamp);
+        uint256 multiplier = 876600;
+        if (rewards == 0) {
+            /// @dev days per year x 100 = 36525
+            uint256 rewards = LPRewards(block.timestamp - 86400, block.timestamp);
+            uint256 multiplier = 36525;
+        }
         uint256 rewardsInEth = rewards.mul(getEthPerRewardPrice()).div(1e18);
-        /// @dev minutes per year x 100 = 52560000
-        return rewardsInEth.mul(876000).mul(1e18).div(stakedEth);
+        return rewardsInEth.mul(multiplier).mul(1e18).div(stakedEth);
     } 
 
     function getRewardPerEthPrice()

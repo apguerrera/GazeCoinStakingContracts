@@ -7,9 +7,9 @@ from settings import *
 
 
 @pytest.fixture(scope='module',autouse= True)
-def access_controls(GazeAccessControls):
-    access_controls = GazeAccessControls.deploy({"from":accounts[0]}) 
-    return access_controls
+def access_control(GazeAccessControls):
+    access_control = GazeAccessControls.deploy({"from":accounts[0]}) 
+    return access_control
 
 
 @pytest.fixture(scope='module', autouse=True)
@@ -21,7 +21,7 @@ def btts_lib(BTTSLib):
 def gaze_coin(BTTSToken, btts_lib):
     name = "GazeCoin Metaverse Token"
     symbol = "GZE"
-    owner = accounts[0]
+    owner = accounts[1]
     initialSupply = 29000000 * 10 ** 18
     gaze_coin = BTTSToken.deploy(owner,symbol, name, 18, initialSupply, False, True, {"from":owner})
 
@@ -51,25 +51,61 @@ def lp_token_from_fork(gaze_coin,weth_token,interface):
     return lp_token_from_fork """
 
 @pytest.fixture(scope='module', autouse=True)
-def gaze_stake_lp(GazeLPStaking,gaze_coin,lp_token,weth_token,access_controls):
-    gaze_stake_lp = GazeLPStaking.deploy({'from':accounts[0]})
-    
-    gaze_coin.approve(gaze_stake_lp,ONE_MILLION ,{'from':accounts[0]})
-    gaze_coin.transfer(gaze_stake_lp,ONE_MILLION ,{'from':accounts[0]})
-    
-    
-    assert gaze_coin.balanceOf(gaze_stake_lp) == ONE_MILLION
-    print(len(chain))
-    gaze_stake_lp.initLPStaking(gaze_coin,lp_token,weth_token,access_controls,len(chain)+10,{"from":accounts[0]})
+def lp_staking(GazeLPStaking,gaze_coin,lp_token,weth_token,access_control):
+    lp_staking = GazeLPStaking.deploy({'from':accounts[0]})
+    lp_staking.initLPStaking(gaze_coin,lp_token,weth_token,access_control,{"from":accounts[0]})
 
-    gaze_stake_lp.setTokensClaimable(True,{"from":accounts[0]})
-    
-    return gaze_stake_lp
+    lp_staking.setTokensClaimable(True)
 
+    return lp_staking
+
+
+
+##############################################
+# Rewards
+##############################################
 
 @pytest.fixture(scope = 'module', autouse = True)
-def rewards_contract(GazeRewards,access_controls,gaze_stake_lp):
-    rewards_contract = GazeRewards.deploy(access_controls,1,gaze_stake_lp,{"from":accounts[0]})
-    rewards_contract.setLPBonus(len(chain)+5000,1,{"from":accounts[0]})
-    gaze_stake_lp.setRewardsContract(rewards_contract,{"from":accounts[0]})
+def rewards_contract(GazeRewards,access_control,gaze_coin, lp_staking):
+    vault = accounts[1]
+    rewards_contract = GazeRewards.deploy(gaze_coin,
+                                        access_control,
+                                        lp_staking,
+                                        chain.time() +10,
+                                        0,
+                                        0,
+                                        {'from': accounts[0]})
+
+    lp_staking.setRewardsContract(rewards_contract,{"from":accounts[0]})
+    gaze_coin.approve(rewards_contract,ONE_MILLION,{"from":vault} )
+    rewards_contract.setVault(vault,{"from":accounts[0]})
+    lp_staking.setTokensClaimable(True,{"from":accounts[0]})
+
     return rewards_contract
+
+
+@pytest.fixture(scope='module', autouse=True)
+def staking_rewards(GazeRewards,gaze_coin,access_control,lp_staking):
+    start_time = chain.time() 
+    staking_rewards = GazeRewards.deploy(
+                gaze_coin,
+                access_control,
+                lp_staking,
+                start_time,
+                0,0,
+                {'from':accounts[0]}
+    )
+
+    vault = accounts[1]
+    gaze_coin.approve(staking_rewards,ONE_MILLION,{"from":vault} )
+
+    lp_staking.setRewardsContract(staking_rewards)
+
+    weeks = [0,1,2,3,4,5]
+    rewards = [700*TENPOW18,700*TENPOW18,500*TENPOW18,350*TENPOW18,150*TENPOW18,100*TENPOW18]
+    staking_rewards.setRewards(weeks,rewards)
+
+    chain.sleep(10000 +20)
+    chain.mine()
+
+    return staking_rewards
