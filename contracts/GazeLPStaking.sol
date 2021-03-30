@@ -12,17 +12,24 @@ contract GazeLPStaking {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-
+    /// @notice Reward token for LP staking.
     IERC20 public rewardsToken;
+
+    /// @notice LP token to stake.
     address public lpToken;
+
+    /// @notice WETH token.
     IWETH public WETH;
 
     GazeAccessControls public accessControls;
     IGazeRewards public rewardsContract;
     
+    /// @notice The sum of all the LP tokens staked.
     uint256 public stakedLPTotal;
     uint256 public lastUpdateTime;
     uint256 public rewardsPerTokenPoints;
+
+    /// @notice The sum of all the unclaimed reward tokens.
     uint256 public totalUnclaimedRewards;
 
     uint256 constant pointMultiplier = 10e22;
@@ -34,28 +41,77 @@ contract GazeLPStaking {
         uint256 rewardsReleased;
     }
 
-    /// @notice mapping of a staker to its current properties
+    /// @notice Mapping from staker address to its current info.
     mapping (address => Staker) public stakers;
 
 
-    /// @notice sets the token to be claimable or not, cannot claim if it set to false
+    /// @notice Sets the token to be claimable or not (cannot claim if it set to false).
     bool public tokensClaimable;
+
+    /// @notice Whether staking has been initialised or not.
     bool private initialised;
+
+    /**
+     * @notice Event emmited when a user has staked LPs.
+     * @param owner Address of the staker.
+     * @param amount Amount staked in LP tokens.
+     */
     event Staked(address indexed owner, uint256 amount);
 
-    /// @notice event emitted when a user has unstaked a token
+    /**
+     * @notice Event emitted when a user has unstaked LPs.
+     * @param owner Address of the unstaker.
+     * @param amount Amount unstaked in LP tokens.
+     */
     event Unstaked(address indexed owner, uint256 amount);
 
-    /// @notice event emitted when a user claims reward
+    /**
+     * @notice Event emitted when a user claims rewards.
+     * @param user Address of the user.
+     * @param reward Reward amount.
+     */
     event RewardPaid(address indexed user, uint256 reward);
-    
+
+    /**
+     * @notice Event emitted when claimable status is updated.
+     * @param status True or False.
+     */
     event ClaimableStatusUpdated(bool status);
+
+    /**
+     * @notice Event emitted when user unstaked in emergency mode.
+     * @param user Address of the user.
+     * @param amount Amount unstaked in LP tokens.
+     */
     event EmergencyUnstake(address indexed user, uint256 amount);
+
+    /**
+     * @notice Event emitted when rewards contract has been updated.
+     * @param oldRewardsToken Address of the old reward token contract.
+     * @param newRewardsToken Address of the new reward token contract.
+     */
     event RewardsContractUpdated(address indexed oldRewardsToken, address newRewardsToken);
-    event LpTokenUpdated(address indexed oldLpToken, address newLpToken );
+
+    /**
+     * @notice Event emitted when LP token has been updated.
+     * @param oldRewardsToken Address of the old LP token contract.
+     * @param newRewardsToken Address of the new LP token contract.
+     */
+    event LpTokenUpdated(address indexed oldLpToken, address newLpToken);
 
 
 
+
+    /**
+     * @notice Initializes main contract variables.
+     * @dev Init function.
+     * @param _rewardsToken Reward token interface.
+     * @param _lpToken Address of the LP token.
+     * @param _WETH Wrapped Ether interface.
+     * @param _rewardsPerBlock Number of rewards token allocated per block.
+     * @param _accessControls Access controls interface.
+     * @param _startBlock Number of the block when LP staking starts.
+     */
     function initLPStaking(
         IERC20 _rewardsToken,
         address _lpToken,
@@ -105,56 +161,47 @@ contract GazeLPStaking {
         emit Staked(msg.sender, amount);
     }
 
-    
-    function setRewardsContract(address _addr)
-        external
-    {
-        require(
-            accessControls.hasAdminRole(msg.sender),
-            "GazeLPStaking.setRewardsContract: Sender must be admin"
-        );
+
+    /**
+     * @notice Admin can change rewards contract through this function.
+     * @param _addr Address of the new rewards contract.
+     */
+    function setRewardsContract(address _addr) external {
+        require(accessControls.hasAdminRole(msg.sender), "GazeLPStaking.setRewardsContract: Sender must be admin");
         require(_addr != address(0));
         address oldAddr = address(rewardsContract);
         rewardsContract = IGazeRewards(_addr);
         emit RewardsContractUpdated(oldAddr, _addr);
     }
 
-    //Implement Access Control
-    function setLPToken(address _addr) 
-        external 
-    {   
-        require(
-            accessControls.hasAdminRole(msg.sender),
-            "GazeLPStaking.setLPToken: Sender must be admin"
-        );
+    /**
+     * @notice Admin can change LP token through this function.
+     * @param _addr Address of the new LP token contract.
+     */
+    function setLPToken(address _addr) external {
+        require(accessControls.hasAdminRole(msg.sender), "GazeLPStaking.setLPToken: Sender must be admin");
         require(_addr != address(0));
         address oldAddr = lpToken;
         lpToken = _addr;
         emit LpTokenUpdated(oldAddr, _addr);
     }
 
-   
-       //Implement Access Control
-    function setTokensClaimable(bool _enabled)
-        external
-    {
-        require(
-            accessControls.hasAdminRole(msg.sender),
-            "GazeLPStaking.setTokensClaimable: Sender must be admin"
-        );
+    /**
+     * @notice Admin can set reward tokens claimable through this function.
+     * @param _enabled True or False.
+     */
+    function setTokensClaimable(bool _enabled) external {
+        require(accessControls.hasAdminRole(msg.sender), "GazeLPStaking.setTokensClaimable: Sender must be admin");
         tokensClaimable = _enabled;
         emit ClaimableStatusUpdated(_enabled);
     }
 
-    
-  
-    function getStakedBalance(
-        address _user
-    )
-        external
-        view
-        returns (uint256 balance)
-    {
+    /**
+     * @notice Function to retrieve balance of LP tokens staked by a user.
+     * @param _user User address.
+     * @return Number of LP tokens staked.
+     */
+    function getStakedBalance(address _user) external view returns (uint256 balance) {
         return stakers[_user].balance;
     }
 
@@ -164,23 +211,18 @@ contract GazeLPStaking {
         view
         returns (uint256)
     {
-
         uint256 lpPerEth = getLPTokenPerEthUnit(1e18);
         return stakedLPTotal.mul(1e18).div(lpPerEth);
     }
 
-
+    /**
+     * @notice Function for staking exact amount of LP tokens.
+     * @param _amount Number of LP tokens.
+     */
     function stake(uint256 _amount) 
         external
     {       
             _stake(msg.sender, _amount);
-    }
-                
-    function stakeAll()
-        external
-    {
-            uint256 balance = IERC20(lpToken).balanceOf(msg.sender);
-            _stake(msg.sender, balance);
     }
 
     function _stake(
@@ -193,6 +235,11 @@ contract GazeLPStaking {
             _amount > 0,
             "GazeLPStaking._stake: Staked amount must be greater than 0"
         );    
+    /**
+     * @notice Function that executes the staking.
+     * @param _user Stakers address.
+     * @param _amount Number of LP tokens to stake.
+     */
         Staker storage staker = stakers[_user];
 
         if (staker.balance == 0 && staker.lastRewardPoints == 0 ) {
@@ -210,15 +257,22 @@ contract GazeLPStaking {
         emit Staked(_user, _amount);
     }
 
-
-
-    function unstake(uint256 _amount) external{
-            _unstake(msg.sender, _amount);  
+    /**
+     * @notice Function for unstaking exact amount of LP tokens.
+     * @param _amount Number of LP tokens.
+     */
+    function unstake(uint256 _amount) external {
+        _unstake(msg.sender, _amount);
     }
 
+    // CC Either unstakeAll is missing or the unstake and _unstake could be merged into one function?
 
-    function _unstake(address _user, uint256 _amount) internal{
-     
+    /**
+     * @notice Function that executes the unstaking.
+     * @param _user Stakers address.
+     * @param _amount Number of LP tokens to unstake.
+     */
+    function _unstake(address _user, uint256 _amount) internal {
         Staker storage staker = stakers[_user];
 
         require(
@@ -235,6 +289,7 @@ contract GazeLPStaking {
         }
 
         uint256 tokenBal = IERC20(lpToken).balanceOf(address(this));
+
         if (_amount > tokenBal) {
             IERC20(lpToken).safeTransfer(address(_user), tokenBal);
         } else {
@@ -281,6 +336,8 @@ contract GazeLPStaking {
             staker.lastRewardPoints = rewardsPerTokenPoints; 
         }
     }
+     
+
 
     /// @notice Returns the rewards owing for a user
     /// @dev The rewards are dynamic and normalised from the other pools
@@ -310,6 +367,7 @@ contract GazeLPStaking {
     {
         if (stakedLPTotal == 0) {
             return 0;
+        if (pending > 0) {
         }
 
         uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime,
@@ -328,7 +386,10 @@ contract GazeLPStaking {
     }
 
 
-    /// @notice Lets a user with rewards owing to claim tokens
+    /**
+     * @notice Claiming rewards for user.
+     * @param _user User address.
+     */
     function claimReward(
         address _user
     )
@@ -438,6 +499,7 @@ contract GazeLPStaking {
             to.transfer(withdrawAmount);
         }
     }
+}
 
 
     function getLPTokenPerEthUnit(uint ethAmt) public view  returns (uint liquidity){

@@ -21,6 +21,7 @@ contract GazeRewards {
     /* ========== Variables ========== */
 
     Rewards public rewardsToken;
+    /// @notice Contract GazeAccessControls.
     GazeAccessControls public accessControls;
     IGazeStaking public lpStaking;
     address public vault;
