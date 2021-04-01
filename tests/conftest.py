@@ -114,7 +114,7 @@ def staking_rewards(GazeLPStaking, GazeRewards, gaze_coin, lp_token, weth_token,
     staking_rewards.setTokensClaimable(True,{"from":accounts[0]})
 
     weeks = [0,1,2,3,4,5]
-    rewards = [700*TENPOW18,700*TENPOW18,500*TENPOW18,350*TENPOW18,150*TENPOW18,100*TENPOW18]
+    rewards = [70000*TENPOW18,60000*TENPOW18,50000*TENPOW18,50000*TENPOW18,45000*TENPOW18,42000*TENPOW18]
     rewards_contract.setRewards(weeks,rewards)
 
     chain.sleep(20)
