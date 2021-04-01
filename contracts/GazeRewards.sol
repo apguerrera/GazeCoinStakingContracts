@@ -239,7 +239,7 @@ contract GazeRewards {
         uint256 toWeek = diffDays(startTime, _to) / PERIOD_LENGTH;                          
 
         if (fromWeek == toWeek) {
-            return _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek],_to.sub(_from));
+            return _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek], _to.sub(_from));
         }
 
         /// @dev First count remainer of first week 
@@ -252,7 +252,7 @@ contract GazeRewards {
         }
         /// @dev Adds any remaining time in the most recent week till _to
         uint256 finalRemander = _to.sub(toWeek.mul(SECONDS_PER_PERIOD).add(startTime));
-        rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[toWeek],finalRemander));
+        rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[toWeek], finalRemander));
 
         return rewards;
     }
@@ -353,8 +353,8 @@ contract GazeRewards {
         uint256 multiplier = 876600;
         if (rewards == 0) {
             /// @dev days per year x 100 = 36525
-            uint256 rewards = LPRewards(block.timestamp - 86400, block.timestamp);
-            uint256 multiplier = 36525;
+            rewards = LPRewards(block.timestamp - 86400, block.timestamp);
+            multiplier = 36525;
         }
         uint256 rewardsInEth = rewards.mul(getEthPerRewardPrice()).div(1e18);
         return rewardsInEth.mul(multiplier).mul(1e18).div(stakedEth);

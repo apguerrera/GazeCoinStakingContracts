@@ -92,7 +92,7 @@ def rewards_contract(GazeRewards,access_control,gaze_coin, lp_staking):
 
 
 @pytest.fixture(scope='module', autouse=True)
-def staking_rewards(GazeLPStaking, GazeRewards, gaze_coin,lp_token,weth_token,access_control):
+def staking_rewards(GazeLPStaking, GazeRewards, gaze_coin, lp_token, weth_token, access_control):
     staking_rewards = GazeLPStaking.deploy({'from':accounts[0]})
     staking_rewards.initLPStaking(gaze_coin,lp_token,weth_token,access_control,{"from":accounts[0]})
 

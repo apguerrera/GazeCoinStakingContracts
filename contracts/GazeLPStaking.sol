@@ -94,12 +94,10 @@ contract GazeLPStaking {
 
     /**
      * @notice Event emitted when LP token has been updated.
-     * @param oldRewardsToken Address of the old LP token contract.
-     * @param newRewardsToken Address of the new LP token contract.
+     * @param oldLpToken Address of the old LP token contract.
+     * @param newLpToken Address of the new LP token contract.
      */
     event LpTokenUpdated(address indexed oldLpToken, address newLpToken);
-
-
 
 
     /**
@@ -108,9 +106,7 @@ contract GazeLPStaking {
      * @param _rewardsToken Reward token interface.
      * @param _lpToken Address of the LP token.
      * @param _WETH Wrapped Ether interface.
-     * @param _rewardsPerBlock Number of rewards token allocated per block.
      * @param _accessControls Access controls interface.
-     * @param _startBlock Number of the block when LP staking starts.
      */
     function initLPStaking(
         IERC20 _rewardsToken,
@@ -199,7 +195,7 @@ contract GazeLPStaking {
     /**
      * @notice Function to retrieve balance of LP tokens staked by a user.
      * @param _user User address.
-     * @return Number of LP tokens staked.
+     * @return balance of LP tokens staked.
      */
     function getStakedBalance(address _user) external view returns (uint256 balance) {
         return stakers[_user].balance;
@@ -313,6 +309,7 @@ contract GazeLPStaking {
 
 
     /// @dev Updates the amount of rewards owed for each user before any tokens are moved
+    // TODO: revert for an non existing user?
     function updateReward(
         address _user
     ) 
@@ -358,20 +355,16 @@ contract GazeLPStaking {
 
 
     /// @notice Returns the about of rewards yet to be claimed
-    function unclaimedRewards(
-        address _user
-    )
-        public
-        view
-        returns(uint256)
+    function unclaimedRewards(address _user) public view returns(uint256)
     {
         if (stakedLPTotal == 0) {
             return 0;
-        if (pending > 0) {
         }
+        // TODO: remove
+        // if (pending > 0) { 
+        // }
 
-        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime,
-                                                        block.timestamp);
+        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
 
         uint256 newRewardPerToken = rewardsPerTokenPoints.add(lpRewards
                                                                 .mul(1e18)
@@ -390,11 +383,7 @@ contract GazeLPStaking {
      * @notice Claiming rewards for user.
      * @param _user User address.
      */
-    function claimReward(
-        address _user
-    )
-        public
-    {
+    function claimReward(address _user) public {
         require(
             tokensClaimable == true,
             "Tokens cannnot be claimed yet"
@@ -499,7 +488,6 @@ contract GazeLPStaking {
             to.transfer(withdrawAmount);
         }
     }
-}
 
 
     function getLPTokenPerEthUnit(uint ethAmt) public view  returns (uint liquidity){
