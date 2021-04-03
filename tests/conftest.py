@@ -107,11 +107,11 @@ def staking_rewards(GazeLPStaking, GazeRewards, gaze_coin, lp_token, weth_token,
 
 
     assert gaze_coin.balanceOf(vault) > 0
-    gaze_coin.approve(rewards_contract,ONE_MILLION,{"from":vault} )
-    rewards_contract.setVault(vault,{"from":accounts[0]})
+    gaze_coin.approve(rewards_contract, ONE_MILLION, {"from":vault} )
+    rewards_contract.setVault(vault, {"from":accounts[0]})
 
-    staking_rewards.setRewardsContract(rewards_contract,{"from":accounts[0]})
-    staking_rewards.setTokensClaimable(True,{"from":accounts[0]})
+    staking_rewards.setRewardsContract(rewards_contract, {"from":accounts[0]})
+    staking_rewards.setTokensClaimable(True, {"from":accounts[0]})
 
     weeks = [0,1,2,3,4,5]
     rewards = [700*TENPOW18,700*TENPOW18,500*TENPOW18,350*TENPOW18,150*TENPOW18,100*TENPOW18]

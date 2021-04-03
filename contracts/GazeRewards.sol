@@ -279,8 +279,7 @@ contract GazeRewards {
         pure
         returns(uint256)
     {
-        return rate.mul(duration)
-            .div(1e18);
+        return rate.mul(duration);
     }
 
     function max(uint256 a, uint256 b) internal pure returns (uint256 c) {
