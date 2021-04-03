@@ -360,9 +360,6 @@ contract GazeLPStaking {
         if (stakedLPTotal == 0) {
             return 0;
         }
-        // TODO: remove
-        // if (pending > 0) { 
-        // }
 
         uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
 
