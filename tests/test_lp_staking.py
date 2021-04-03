@@ -146,9 +146,9 @@ def test_multiple_staking_and_unstaking(lp_token, staking_rewards, rewards_contr
     chain.sleep(ONE_WEEK*2)
 
     # Unstaking 1/2
-    week_1_rewards = 700 * TENPOW18
+    week_1_rewards = 70000 * TENPOW18
     participants = 5
-    first_week_rewards_per_staker = week_1_rewards / participants  # TODO Question: Why do stakers get only half of rewards??
+    first_week_rewards_per_staker = week_1_rewards / participants
     for i in range(2, 7):
         staker = accounts[i]
         unstaking_amount = 25 * TENPOW18
@@ -164,6 +164,8 @@ def test_multiple_staking_and_unstaking(lp_token, staking_rewards, rewards_contr
     chain.sleep(ONE_WEEK*2)
 
     # Unstaking 2/2
+    week_2_rewards = 60000 * TENPOW18
+    second_week_rewards_per_staker = week_2_rewards / participants
     for i in range(2, 7):
         staker = accounts[i]
         unstaking_amount = 25 * TENPOW18
@@ -174,7 +176,7 @@ def test_multiple_staking_and_unstaking(lp_token, staking_rewards, rewards_contr
 
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
 
-        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(first_week_rewards_per_staker / TENPOW18)
+        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(second_week_rewards_per_staker / TENPOW18)
 
 
 def test_staking_and_then_complete_unstaking(lp_token, staking_rewards, gaze_coin):
@@ -197,7 +199,7 @@ def test_staking_and_then_complete_unstaking(lp_token, staking_rewards, gaze_coi
    
     after_stake_rewards_balance = gaze_coin.balanceOf(staker)
 
-    first_week_rewards_per_staker = 700 * TENPOW18
+    first_week_rewards_per_staker = 70000 * TENPOW18
     assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(first_week_rewards_per_staker/ TENPOW18)
     assert staking_rewards.stakers(staker)[0] == 0
     assert staking_rewards.stakers(staker)[1] == 0
@@ -234,7 +236,7 @@ def test_staking_12_weeks(lp_token, staking_rewards, rewards_contract, gaze_coin
 
     tx = staking_rewards.claimReward(staker, {'from': staker})
     staker_info = staking_rewards.stakers(staker)
-    assert round(gaze_coin.balanceOf(staker) / TENPOW18) == 2500
+    assert round(gaze_coin.balanceOf(staker) / TENPOW18) + 5 >= 317000
 
 
 def test_unstaking_without_balance(staking_rewards, lp_token):
