@@ -8,10 +8,10 @@ def load_accounts():
         accounts.load("Gaze")
     # add accounts if active network is goerli
     if network.show_active() in ['goerli', 'ropsten','kovan','rinkeby']:
-        # 0x2A40019ABd4A61d71aBB73968BaB068ab389a636
-        accounts.add('4ca89ec18e37683efa18e0434cd9a28c82d461189c477f5622dae974b43baebf')
-        # 0x1F3389Fc75Bf55275b03347E4283f24916F402f7
-        accounts.add('fa3c06c67426b848e6cef377a2dbd2d832d3718999fbe377236676c9216d8ec0')
+        # 0xa5C9fb5D557daDb10c4B5c70943d610001B7420E 
+        accounts.add('6a202283db75b6ea23175f3c795d4e73154a28bd7e72ec0d31a8ab76f9d80200')
+        # 0x9135C43D7bA230d372A12B354c2E2Cf58b081463
+        accounts.add('6a202283db75b6ea23175f3c795d4e73154a28bd7e72ec0d31a8ab76f9d80201')
 
 def deploy_access_controls():
     access_control_address = CONTRACTS[network.show_active()]["access_control"]
