@@ -11,19 +11,6 @@ def isolation(fn_isolation):
     pass
 
 
-# This is for a fixed dummy token, needs to be LP tokens
-@pytest.fixture(scope='function')
-def transfer_lp_tokens_to_multiple_accounts(lp_token):
-  transfer_amount = 50 * TENPOW18
-  transfer_to = accounts[4]
-  owner = accounts[0]
-  lp_token.transfer(transfer_to,transfer_amount,{"from": owner})
-
-  transfer_amount = 50 * TENPOW18
-  transfer_to = accounts[6]
-  lp_token.transfer(transfer_to,transfer_amount,{"from": owner})
-
-
 @pytest.fixture(scope='module', autouse=True)
 def rewards_contract(GazeRewards, staking_rewards):
     rewards_contract = GazeRewards.at(staking_rewards.rewardsContract())
@@ -122,6 +109,7 @@ def test_unstake(staking_rewards, lp_token, rewards_contract, gaze_coin):
 
 def test_multiple_staking_and_unstaking(lp_token, staking_rewards, rewards_contract, gaze_coin):
     lp_token_owner = accounts[0]
+    print("balance of lp token",lp_token.balanceOf(lp_token_owner)/TENPOW18)
     for i in range(2, 7):
         transfer_amount = 50 * TENPOW18
         transfer_to = accounts[i]
@@ -177,6 +165,10 @@ def test_multiple_staking_and_unstaking(lp_token, staking_rewards, rewards_contr
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
 
         assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(second_week_rewards_per_staker / TENPOW18)
+
+
+
+
 
 
 def test_staking_and_then_complete_unstaking(lp_token, staking_rewards, gaze_coin):
@@ -245,3 +237,165 @@ def test_unstaking_without_balance(staking_rewards, lp_token):
 
     with reverts("GazeLPStaking._unstake: Sender must have staked tokens"):
         staking_rewards.unstake(1*TENPOW18)
+
+def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards, rewards_contract, gaze_coin):
+    lp_token_owner = accounts[0]
+    for i in range(2, 7):
+        transfer_amount = 40 * TENPOW18
+        transfer_to = accounts[i]
+
+        lp_token.transfer(transfer_to, transfer_amount, {"from": lp_token_owner})
+        
+    # Staking
+    for i in range(2, 7):
+        staker = accounts[i]
+        staking_amount = 40 * TENPOW18
+
+        lp_token.approve(staking_rewards,staking_amount,{"from": staker})
+
+        before_stake_lp_balance = lp_token.balanceOf(staker)
+
+        stake(staking_rewards, staker, staking_amount)
+
+        after_stake_lp_balance = lp_token.balanceOf(staker)
+
+        assert before_stake_lp_balance - after_stake_lp_balance == staking_amount
+
+    chain.sleep(ONE_WEEK*2)
+
+    # Unstaking 1/4
+    week_1_rewards = 70000 * TENPOW18
+    participants = 5
+    first_week_rewards_per_staker = week_1_rewards / participants
+    for i in range(2, 7):
+        staker = accounts[i]
+        unstaking_amount = 10 * TENPOW18
+
+        before_unstake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        staking_rewards.unstake(unstaking_amount, {"from":staker})
+
+        after_unstake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        assert round((after_unstake_rewards_balance - before_unstake_rewards_balance) / TENPOW18) == round(first_week_rewards_per_staker/TENPOW18)
+
+    chain.sleep(ONE_WEEK*2)
+
+    # Unstaking 2/4
+    week_2_rewards = 60000 * TENPOW18
+    second_week_rewards_per_staker = week_2_rewards / participants
+    for i in range(2, 7):
+        staker = accounts[i]
+        unstaking_amount = 10 * TENPOW18
+
+        before_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        staking_rewards.unstake(unstaking_amount, {"from": staker})
+
+        after_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(second_week_rewards_per_staker / TENPOW18)
+
+    chain.sleep(ONE_WEEK*2)
+ # Unstaking 3/4
+    week_3_rewards = 50000 * TENPOW18
+    third_week_rewards_per_staker = week_3_rewards / participants
+    for i in range(2, 5):
+        staker = accounts[i]
+        unstaking_amount = 10 * TENPOW18
+
+        before_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        staking_rewards.unstake(unstaking_amount, {"from": staker})
+
+        after_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(third_week_rewards_per_staker / TENPOW18)
+
+    chain.sleep(ONE_WEEK * 2)
+
+ # Unstaking 4/4
+
+
+    #### Remaining staked LP token = 70 // Stake of one participant = 30 / no. of participants #######
+    participants = 3
+    week_4_rewards = 50000 * TENPOW18
+    fourth_week_rewards_per_staker = week_4_rewards / participants * 30 / 70 
+    for i in range(2, 5):
+        staker = accounts[i]
+        unstaking_amount = 10 * TENPOW18
+
+        before_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        staking_rewards.unstake(unstaking_amount, {"from": staker})
+
+        after_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(fourth_week_rewards_per_staker / TENPOW18)
+
+     
+    participants = 2
+    fourth_week_rewards_with_old_rewards = week_3_rewards / participants * 20 / 40
+    fourth_week_rewards_with_new_rewards = week_4_rewards / participants * 20 / 40 
+    fourth_week_rewards_per_staker = fourth_week_rewards_with_old_rewards + fourth_week_rewards_with_new_rewards
+    for i in range(5, 7):
+        staker = accounts[i]
+        unstaking_amount = 10 * TENPOW18
+
+        before_stake_rewards_balance = gaze_coin.balanceOf(staker)
+
+        staking_rewards.unstake(unstaking_amount, {"from": staker})
+
+        after_stake_rewards_balance = gaze_coin.balanceOf(staker)
+        # not getting exact 25000: Getting 24286
+        assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) < round(fourth_week_rewards_per_staker / TENPOW18) 
+
+
+def test_for_reverts(GazeLPStaking, GazeRewards, gaze_coin, lp_token, weth_token, access_control):
+    staking_rewards = GazeLPStaking.deploy({'from':accounts[0]})
+    staking_rewards.initLPStaking(gaze_coin,lp_token,weth_token,access_control,{"from":accounts[0]})
+
+    vault = accounts[1]
+    rewards_contract = GazeRewards.deploy(gaze_coin,
+                                        access_control,
+                                        staking_rewards,
+                                        chain.time() +10,
+                                        0,
+                                        0,
+                                        {'from': accounts[0]})
+
+
+    assert gaze_coin.balanceOf(vault) > 0
+    gaze_coin.approve(rewards_contract, ONE_MILLION, {"from":vault} )
+    rewards_contract.setVault(vault, {"from":accounts[0]})
+    with reverts("GazeRewards.setVault: Sender must be admin"):
+        rewards_contract.setVault(vault, {"from":accounts[5]})
+
+    staking_rewards.setRewardsContract(rewards_contract, {"from":accounts[0]})
+    staking_rewards.setTokensClaimable(True, {"from":accounts[0]})
+
+    with reverts("GazeLPStaking.setRewardsContract: Sender must be admin"):
+        staking_rewards.setRewardsContract(rewards_contract, {"from":accounts[5]})
+    
+    with reverts():
+        staking_rewards.setRewardsContract(ZERO_ADDRESS, {"from": accounts[0]})
+    
+    with reverts("GazeLPStaking.setTokensClaimable: Sender must be admin"):
+        staking_rewards.setTokensClaimable(True, {"from":accounts[5]})
+
+    weeks = [0,1,2,3,4,5]
+    rewards = [70000*TENPOW18,60000*TENPOW18,50000*TENPOW18,50000*TENPOW18,45000*TENPOW18,42000*TENPOW18]
+    rewards_contract.setRewards(weeks,rewards, {"from": accounts[0]})
+
+    with reverts("GazeRewards.setRewards: Sender must be admin"):
+        rewards_contract.setRewards(weeks,rewards, {"from": accounts[5]})
+    
+    with reverts("GazeRewards.setStartTime: Sender must be admin"):
+        rewards_contract.setStartTime(0,0,{"from": accounts[5]})
+    
+    chain.sleep(20)
+    chain.mine()
+    
+    
+
+

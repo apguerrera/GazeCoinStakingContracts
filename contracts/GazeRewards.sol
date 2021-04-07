@@ -99,7 +99,7 @@ contract GazeRewards {
     {
         require(
             accessControls.hasAdminRole(msg.sender),
-            "GazeRewards.setStartTime: Sender must be admin"
+            "GazeRewards.setInitialPoints: Sender must be admin"
         );
         Weights storage weights = weeklyWeightPoints[week];
         weights.lpWeightPoints = mW;
@@ -125,7 +125,7 @@ contract GazeRewards {
     {
         require(
             accessControls.hasAdminRole(msg.sender),
-            "GazeRewards.setLPStaking: Sender must be admin"
+            "GazeRewards.setVault: Sender must be admin"
         );
         vault = _addr;
     } 
