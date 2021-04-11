@@ -3,13 +3,13 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
- * @notice Access Controls contract for the Digitalax Platform
+ * @notice Access Controls contract for the Gaze Platform
  * @author BlockRocket.tech
  */
-contract DigitalaxAccessControls is AccessControl {
+contract GazeAccessControls is AccessControl {
     /// @notice Role definitions
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant SMART_CONTRACT_ROLE = keccak256("SMART_CONTRACT_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @notice Events for adding and removing various roles
     event AdminRoleGranted(
@@ -32,12 +32,12 @@ contract DigitalaxAccessControls is AccessControl {
         address indexed caller
     );
 
-    event SmartContractRoleGranted(
+    event OperatorRoleGranted(
         address indexed beneficiary,
         address indexed caller
     );
 
-    event SmartContractRoleRemoved(
+    event OperatorRoleRemoved(
         address indexed beneficiary,
         address indexed caller
     );
@@ -76,8 +76,8 @@ contract DigitalaxAccessControls is AccessControl {
      * @param _address EOA or contract being checked
      * @return bool True if the account has the role or false if it does not
      */
-    function hasSmartContractRole(address _address) external view returns (bool) {
-        return hasRole(SMART_CONTRACT_ROLE, _address);
+    function hasOperatorRole(address _address) external view returns (bool) {
+        return hasRole(OPERATOR_ROLE, _address);
     }
 
     ///////////////
@@ -129,9 +129,9 @@ contract DigitalaxAccessControls is AccessControl {
      * @dev The sender must have the admin role
      * @param _address EOA or contract receiving the new role
      */
-    function addSmartContractRole(address _address) external {
-        grantRole(SMART_CONTRACT_ROLE, _address);
-        emit SmartContractRoleGranted(_address, _msgSender());
+    function addOperatorRole(address _address) external {
+        grantRole(OPERATOR_ROLE, _address);
+        emit OperatorRoleGranted(_address, _msgSender());
     }
 
     /**
@@ -139,8 +139,8 @@ contract DigitalaxAccessControls is AccessControl {
      * @dev The sender must have the admin role
      * @param _address EOA or contract affected
      */
-    function removeSmartContractRole(address _address) external {
-        revokeRole(SMART_CONTRACT_ROLE, _address);
-        emit SmartContractRoleRemoved(_address, _msgSender());
+    function removeOperatorRole(address _address) external {
+        revokeRole(OPERATOR_ROLE, _address);
+        emit OperatorRoleRemoved(_address, _msgSender());
     }
 }
