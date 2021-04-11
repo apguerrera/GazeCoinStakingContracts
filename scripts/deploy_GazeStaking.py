@@ -29,3 +29,5 @@ def main():
 
     gaze_coin.approve(rewards,ONE_MILLION, {'from':accounts[0]})
     lp_staking.setRewardsContract(rewards,{"from":accounts[0]})
+
+    
