@@ -24,32 +24,33 @@ contract GazeLPStaking {
     GazeAccessControls public accessControls;
     IGazeRewards public rewardsContract;
     
-    /// @notice The sum of all the LP tokens staked.
-    uint256 public stakedLPTotal;
-    uint256 public lastUpdateTime;
-    uint256 public rewardsPerTokenPoints;
-
-    /// @notice The sum of all the unclaimed reward tokens.
-    uint256 public totalUnclaimedRewards;
-
-    uint256 constant pointMultiplier = 10e22;
-
-    struct Staker {
-        uint256 balance;
-        uint256 lastRewardPoints;
-        uint256 rewardsEarned;
-        uint256 rewardsReleased;
-    }
-
-    /// @notice Mapping from staker address to its current info.
-    mapping (address => Staker) public stakers;
-
 
     /// @notice Sets the token to be claimable or not (cannot claim if it set to false).
     bool public tokensClaimable;
 
     /// @notice Whether staking has been initialised or not.
     bool private initialised;
+    
+    /// @notice The sum of all the LP tokens staked.
+    uint64 public lastUpdateTime;
+    uint128 public stakedLPTotal;
+    uint256 public rewardsPerTokenPoints;
+
+    /// @notice The sum of all the unclaimed reward tokens.
+
+    uint256 constant pointMultiplier = 10e22;
+
+    struct Staker {
+        uint256 balance;
+        uint256 lastRewardPoints;
+        uint128 rewardsEarned;
+        uint128 rewardsReleased;
+    }
+
+    /// @notice Mapping from staker address to its current info.
+    mapping (address => Staker) public stakers;
+
+
 
     /**
      * @notice Event emmited when a user has staked LPs.
@@ -120,7 +121,7 @@ contract GazeLPStaking {
         lpToken = _lpToken;
         WETH = _WETH;
         accessControls = _accessControls;
-        lastUpdateTime = block.timestamp;
+        lastUpdateTime = uint64(block.timestamp);
         initialised = true;
     }
     
@@ -153,7 +154,7 @@ contract GazeLPStaking {
 
         updateReward(msg.sender);
         staker.balance = staker.balance.add(amount);
-        stakedLPTotal = stakedLPTotal.add(amount);
+        stakedLPTotal = uint128(uint256(stakedLPTotal).add(amount));
         emit Staked(msg.sender, amount);
     }
 
@@ -208,7 +209,7 @@ contract GazeLPStaking {
         returns (uint256)
     {
         uint256 lpPerEth = getLPTokenPerEthUnit(1e18);
-        return stakedLPTotal.mul(1e18).div(lpPerEth);
+        return uint256(stakedLPTotal).mul(1e18).div(lpPerEth);
     }
 
     /**
@@ -244,7 +245,7 @@ contract GazeLPStaking {
 
         updateReward(_user);
         staker.balance = staker.balance.add(_amount);
-        stakedLPTotal = stakedLPTotal.add(_amount);
+        stakedLPTotal = uint128(uint256(stakedLPTotal).add(_amount));
         IERC20(lpToken).safeTransferFrom(
             address(_user),
             address(this),
@@ -278,7 +279,7 @@ contract GazeLPStaking {
         claimReward(_user);
         
         staker.balance = staker.balance.sub(_amount);
-        stakedLPTotal = stakedLPTotal.sub(_amount);
+        stakedLPTotal = uint128(uint256(stakedLPTotal).sub(_amount));
 
         if (staker.balance == 0) {
             delete stakers[_user];
@@ -317,19 +318,19 @@ contract GazeLPStaking {
     {
 
         rewardsContract.updateRewards();
-        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
+        uint256 lpRewards = rewardsContract.LPRewards(uint256(lastUpdateTime), block.timestamp);
 
         if (stakedLPTotal > 0) {
             rewardsPerTokenPoints = rewardsPerTokenPoints.add(lpRewards.mul(1e18)
                         .mul(pointMultiplier)
-                        .div(stakedLPTotal));
+                        .div(uint256(stakedLPTotal)));
         }
         
-        lastUpdateTime = block.timestamp;
+        lastUpdateTime = uint64(block.timestamp);
         uint256 rewards = rewardsOwing(_user);
         Staker storage staker = stakers[_user];
         if (_user != address(0)) {
-            staker.rewardsEarned = staker.rewardsEarned.add(rewards);
+            staker.rewardsEarned = uint128(uint256(staker.rewardsEarned).add(rewards));
             staker.lastRewardPoints = rewardsPerTokenPoints; 
         }
     }
@@ -346,8 +347,10 @@ contract GazeLPStaking {
         view
         returns(uint256)
     {
-        uint256 newRewardPerToken = rewardsPerTokenPoints.sub(stakers[_user].lastRewardPoints);
-        uint256 rewards = stakers[_user].balance.mul(newRewardPerToken)
+        Staker memory staker = stakers[_user];
+
+        uint256 newRewardPerToken = rewardsPerTokenPoints.sub(staker.lastRewardPoints);
+        uint256 rewards = staker.balance.mul(newRewardPerToken)
                                                 .div(1e18)
                                                 .div(pointMultiplier);
         return rewards;
@@ -361,18 +364,18 @@ contract GazeLPStaking {
             return 0;
         }
 
-        uint256 lpRewards = rewardsContract.LPRewards(lastUpdateTime, block.timestamp);
+        uint256 lpRewards = rewardsContract.LPRewards(uint256(lastUpdateTime), block.timestamp);
 
         uint256 newRewardPerToken = rewardsPerTokenPoints.add(lpRewards
                                                                 .mul(1e18)
                                                                 .mul(pointMultiplier)
-                                                                .div(stakedLPTotal))
+                                                                .div(uint256(stakedLPTotal)))
                                                          .sub(stakers[_user].lastRewardPoints);
 
         uint256 rewards = stakers[_user].balance.mul(newRewardPerToken)
                                                 .div(1e18)
                                                 .div(pointMultiplier);
-        return rewards.add(stakers[_user].rewardsEarned).sub(stakers[_user].rewardsReleased);
+        return rewards.add(uint256(stakers[_user].rewardsEarned)).sub(uint256(stakers[_user].rewardsReleased));
     }
 
 
@@ -389,8 +392,8 @@ contract GazeLPStaking {
 
         Staker storage staker = stakers[_user];
     
-        uint256 payableAmount = staker.rewardsEarned.sub(staker.rewardsReleased);
-        staker.rewardsReleased = staker.rewardsReleased.add(payableAmount);
+        uint256 payableAmount = uint256(staker.rewardsEarned).sub(uint256(staker.rewardsReleased));
+        staker.rewardsReleased = uint128(uint256(staker.rewardsReleased).add(payableAmount));
 
         /// @dev accounts for dust 
         uint256 rewardBal = rewardsToken.balanceOf(address(this));
@@ -398,7 +401,7 @@ contract GazeLPStaking {
             payableAmount = rewardBal;
         }
         
-        rewardsToken.transfer(_user, payableAmount);
+        rewardsToken.safeTransfer(_user, payableAmount);
         emit RewardPaid(_user, payableAmount);
     }
 
@@ -477,7 +480,7 @@ contract GazeLPStaking {
         
         //refund dust
         if (tokenAmount > optimalTokenAmount)
-            rewardsToken.transfer(to, tokenAmount.sub(optimalTokenAmount));
+            rewardsToken.safeTransfer(to, tokenAmount.sub(optimalTokenAmount));
 
         if (wethAmount > optimalWETHAmount) {
             uint256 withdrawAmount = wethAmount.sub(optimalWETHAmount);

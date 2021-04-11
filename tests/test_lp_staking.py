@@ -224,12 +224,15 @@ def test_staking_12_weeks(lp_token, staking_rewards, rewards_contract, gaze_coin
 
     stake(staking_rewards, staker, staking_amount)
 
-    chain.sleep(ONE_WEEK*12)
+    chain.sleep(ONE_WEEK*18)
 
     tx = staking_rewards.claimReward(staker, {'from': staker})
     staker_info = staking_rewards.stakers(staker)
-    assert round(gaze_coin.balanceOf(staker) / TENPOW18) + 5 >= 317000
-
+    assert round(gaze_coin.balanceOf(staker) / TENPOW18) + 2 >= 317000
+    assert round(gaze_coin.balanceOf(staker) / TENPOW18) - 2 <= 317000
+    staking_rewards.unstake(staking_amount, {"from":staker})
+    assert round(gaze_coin.balanceOf(staker) / TENPOW18) + 2 >= 317000
+    assert round(gaze_coin.balanceOf(staker) / TENPOW18) - 2 <= 317000
 
 def test_unstaking_without_balance(staking_rewards, lp_token):
     account = accounts[2]
@@ -252,11 +255,8 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         staking_amount = 40 * TENPOW18
 
         lp_token.approve(staking_rewards,staking_amount,{"from": staker})
-
         before_stake_lp_balance = lp_token.balanceOf(staker)
-
         stake(staking_rewards, staker, staking_amount)
-
         after_stake_lp_balance = lp_token.balanceOf(staker)
 
         assert before_stake_lp_balance - after_stake_lp_balance == staking_amount
@@ -272,11 +272,8 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         unstaking_amount = 10 * TENPOW18
 
         before_unstake_rewards_balance = gaze_coin.balanceOf(staker)
-
         staking_rewards.unstake(unstaking_amount, {"from":staker})
-
         after_unstake_rewards_balance = gaze_coin.balanceOf(staker)
-
         assert round((after_unstake_rewards_balance - before_unstake_rewards_balance) / TENPOW18) == round(first_week_rewards_per_staker/TENPOW18)
 
     chain.sleep(ONE_WEEK*2)
@@ -289,11 +286,8 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         unstaking_amount = 10 * TENPOW18
 
         before_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         staking_rewards.unstake(unstaking_amount, {"from": staker})
-
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(second_week_rewards_per_staker / TENPOW18)
 
     chain.sleep(ONE_WEEK*2)
@@ -305,11 +299,8 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         unstaking_amount = 10 * TENPOW18
 
         before_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         staking_rewards.unstake(unstaking_amount, {"from": staker})
-
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(third_week_rewards_per_staker / TENPOW18)
 
     chain.sleep(ONE_WEEK * 2)
@@ -326,9 +317,7 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         unstaking_amount = 10 * TENPOW18
 
         before_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         staking_rewards.unstake(unstaking_amount, {"from": staker})
-
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
 
         assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) == round(fourth_week_rewards_per_staker / TENPOW18)
@@ -343,9 +332,7 @@ def test_multiple_staking_and_unstaking_multiple_weeks(lp_token, staking_rewards
         unstaking_amount = 10 * TENPOW18
 
         before_stake_rewards_balance = gaze_coin.balanceOf(staker)
-
         staking_rewards.unstake(unstaking_amount, {"from": staker})
-
         after_stake_rewards_balance = gaze_coin.balanceOf(staker)
         # not getting exact 25000: Getting 24286
         assert round((after_stake_rewards_balance -  before_stake_rewards_balance) / TENPOW18) < round(fourth_week_rewards_per_staker / TENPOW18) 

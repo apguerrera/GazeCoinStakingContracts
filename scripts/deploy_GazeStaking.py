@@ -7,12 +7,14 @@ from .deploy_setBonus import *
 
 def main():
     load_accounts()
-    access_control = deploy_access_controls()
-    deploy_btts_lib()
-    gaze_coin = deploy_gaze_coin(GAZE_COIN_NAME,GAZE_COIN_SYMBOL,GAZE_COIN_INITIAL_SUPPLY)
+
     vault = accounts[0]
+
+    access_control = deploy_access_controls()
+    gaze_coin = deploy_gaze_coin(GAZE_COIN_NAME,GAZE_COIN_SYMBOL,GAZE_COIN_INITIAL_SUPPLY)
     weth_token = deploy_weth_token()
     lp_token = deploy_uniswap_pool(gaze_coin, weth_token)
+
     print("Uniswap Pool Token (LP): ", str(lp_token))
 
     lp_staking = deploy_lp_staking(gaze_coin,lp_token,weth_token,access_control)

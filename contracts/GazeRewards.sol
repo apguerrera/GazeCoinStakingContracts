@@ -34,10 +34,14 @@ contract GazeRewards {
     // weekNumber => rewards
     mapping (uint256 => uint256) public weeklyRewardsPerSecond;
 
-    uint256 public startTime;
-    uint256 public lastRewardTime;
 
-    uint256 public lpRewardsPaid;
+    struct RewardsData {
+        uint64 startTime;
+        uint64 lastRewardTime;
+        uint128  lpRewardsPaid;
+    }
+    RewardsData public rewardData;
+
 
     /* ========== Structs ========== */
 
@@ -69,9 +73,9 @@ contract GazeRewards {
         rewardsToken = Rewards(_rewardsToken);
         accessControls = GazeAccessControls(_accessControls);
         lpStaking = IGazeStaking(_lpStaking);
-        startTime = _startTime;
-        lastRewardTime = _lastRewardTime;
-        lpRewardsPaid = _lpRewardsPaid;        
+        rewardData.startTime = uint64(_startTime);
+        rewardData.lastRewardTime = uint64(_lastRewardTime);
+        rewardData.lpRewardsPaid = uint128(_lpRewardsPaid);        
     }
 
     /// @dev Setter functions for contract config
@@ -85,8 +89,8 @@ contract GazeRewards {
             accessControls.hasAdminRole(msg.sender),
             "GazeRewards.setStartTime: Sender must be admin"
         );
-        startTime = _startTime;
-        lastRewardTime = _lastRewardTime;
+        rewardData.startTime = uint64(_startTime);
+        rewardData.lastRewardTime = uint64(_lastRewardTime);
     }
 
     /// @dev Setter functions for contract config
@@ -169,22 +173,22 @@ contract GazeRewards {
         external
         returns(bool)
     {
-        if (block.timestamp <= lastRewardTime) {
+        if (block.timestamp <= uint256(rewardData.lastRewardTime)) {
             return false;
         }
 
         uint256 m_net = lpStaking.stakedEthTotal();
 
         /// @dev check that the staking pools have contributions, and rewards have started
-        if (m_net == 0 || block.timestamp <= startTime) {
-            lastRewardTime = block.timestamp;
+        if (m_net == 0 || block.timestamp <= uint256(rewardData.startTime)) {
+            rewardData.lastRewardTime = uint64(block.timestamp);
             return false;
         }
 
         _updateLPRewards();
 
         /// @dev update accumulated reward
-        lastRewardTime = block.timestamp;
+        rewardData.lastRewardTime = uint64(block.timestamp);
         return true;
     }
 
@@ -193,7 +197,7 @@ contract GazeRewards {
 
     /// @notice Gets the total rewards outstanding from last reward time
     function totalRewards() external view returns (uint256) {
-        uint256 lRewards = LPRewards(lastRewardTime, block.timestamp);
+        uint256 lRewards = LPRewards(uint256(rewardData.lastRewardTime), block.timestamp);
         return lRewards;     
     }
 
@@ -213,7 +217,7 @@ contract GazeRewards {
         view 
         returns(uint256)
     {
-        return diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
+        return diffDays(uint256(rewardData.startTime), block.timestamp) / PERIOD_LENGTH;
     }
 
     function totalRewardsPaid()
@@ -221,7 +225,7 @@ contract GazeRewards {
         view
         returns(uint256)
     {
-        return lpRewardsPaid;
+        return uint256(rewardData.lpRewardsPaid);
     } 
 
   
@@ -229,21 +233,22 @@ contract GazeRewards {
     /// @notice Return LP rewards over the given _from to _to timestamp.
     /// @dev A fraction of the start, multiples of the middle weeks, fraction of the end
     function LPRewards(uint256 _from, uint256 _to) public view returns (uint256 rewards) {
-        if (_to <= startTime) {
+        uint256 _startTime = uint256(rewardData.startTime);
+        if (_to <= _startTime) {
             return 0;
         }
-        if (_from < startTime) {
-            _from = startTime;
+        if (_from < _startTime) {
+            _from = _startTime;
         }
-        uint256 fromWeek = diffDays(startTime, _from) / PERIOD_LENGTH;                      
-        uint256 toWeek = diffDays(startTime, _to) / PERIOD_LENGTH;                          
+        uint256 fromWeek = diffDays(_startTime, _from) / PERIOD_LENGTH;                      
+        uint256 toWeek = diffDays(_startTime, _to) / PERIOD_LENGTH;                          
 
         if (fromWeek == toWeek) {
             return _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek], _to.sub(_from));
         }
 
         /// @dev First count remainer of first week 
-        uint256 initialRemander = startTime.add((fromWeek+1).mul(SECONDS_PER_PERIOD)).sub(_from);
+        uint256 initialRemander = _startTime.add((fromWeek+1).mul(SECONDS_PER_PERIOD)).sub(_from);
         rewards = _rewardsFromPoints(weeklyRewardsPerSecond[fromWeek], initialRemander);
 
         /// @dev add multiples of the week
@@ -251,7 +256,7 @@ contract GazeRewards {
             rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[i],SECONDS_PER_PERIOD));
         }
         /// @dev Adds any remaining time in the most recent week till _to
-        uint256 finalRemander = _to.sub(toWeek.mul(SECONDS_PER_PERIOD).add(startTime));
+        uint256 finalRemander = _to.sub(toWeek.mul(SECONDS_PER_PERIOD).add(_startTime));
         rewards = rewards.add(_rewardsFromPoints(weeklyRewardsPerSecond[toWeek], finalRemander));
 
         return rewards;
@@ -264,9 +269,16 @@ contract GazeRewards {
         internal
         returns(uint256 rewards)
     {
-        rewards = LPRewards(lastRewardTime, block.timestamp);
+        rewards = LPRewards(uint256(rewardData.lastRewardTime), block.timestamp);
+
+        uint256 vaultBal = rewardsToken.balanceOf(vault);
+
+        if (rewards > vaultBal) {
+            rewards = vaultBal;
+        } 
+
         if ( rewards > 0 ) {
-            lpRewardsPaid = lpRewardsPaid.add(rewards);
+            rewardData.lpRewardsPaid = uint128(uint256(rewardData.lpRewardsPaid).add(rewards));
             require(rewardsToken.transferFrom(vault, address(lpStaking), rewards));
         }
     }
@@ -318,7 +330,7 @@ contract GazeRewards {
         view
         returns(uint256)
     {
-        return diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
+        return diffDays(uint256(rewardData.startTime), block.timestamp) / PERIOD_LENGTH;
     }
 
     function getCurrentLpWeightPoints()
@@ -326,7 +338,7 @@ contract GazeRewards {
         view
         returns(uint256)
     {
-        uint256 currentWeek = diffDays(startTime, block.timestamp) / PERIOD_LENGTH;
+        uint256 currentWeek = diffDays(uint256(rewardData.startTime), block.timestamp) / PERIOD_LENGTH;
         return weeklyWeightPoints[currentWeek].lpWeightPoints;
     }
 
