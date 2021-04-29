@@ -94,6 +94,7 @@ contract GazeRewards {
     }
 
     /// @dev Setter functions for contract config
+    /// @dev Not used for LP pool, will be used for NFT staking
     function setInitialPoints(
         uint256 week,
         uint256 mW

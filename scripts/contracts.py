@@ -5,7 +5,7 @@ from .contract_addresses import *
 def load_accounts():
     if network.show_active() == 'mainnet':
         # replace with your keys
-        accounts.load("Gaze")
+        accounts.load("gaze")
     # add accounts if active network is goerli
     if network.show_active() in ['goerli', 'ropsten','kovan','rinkeby']:
         # 0xa5C9fb5D557daDb10c4B5c70943d610001B7420E 
@@ -83,6 +83,9 @@ def deploy_rewards(rewards_token,lp_staking, access_control, start_time,last_tim
         rewards = GazeRewards.at(rewards_address)
     return rewards
 
+def get_rewards():
+    rewards_address = CONTRACTS[network.show_active()]["rewards_contract"]
+    return GazeRewards.at(rewards_address) 
 
 def deploy_lp_staking(rewards_token, lp_token,weth_token, access_control):
     lp_staking_address = CONTRACTS[network.show_active()]["lp_staking"]
@@ -92,6 +95,11 @@ def deploy_lp_staking(rewards_token, lp_token,weth_token, access_control):
     else:
         lp_staking = GazeLPStaking.at(lp_staking_address)
     return lp_staking
+
+def get_lp_staking():
+    lp_staking_address = CONTRACTS[network.show_active()]["lp_staking"]
+    return GazeLPStaking.at(lp_staking_address) 
+        
 
 def deploy_btts_lib():
     btts_lib_address = CONTRACTS[network.show_active()]["btts_lib"]

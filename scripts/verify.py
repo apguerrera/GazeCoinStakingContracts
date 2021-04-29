@@ -17,9 +17,9 @@ def verify(contract_id, container):
 def main():
 
     verify("access_control", GazeAccessControls)
-    verify("gaze_coin", BTTSToken) 
-    verify("weth", WETH9) 
-    verify("lp_token", UniswapV2Pair) 
+    # verify("gaze_coin", BTTSToken) 
+    # verify("weth", WETH9) 
+    # verify("lp_token", UniswapV2Pair) 
     verify("rewards_contract", GazeRewards) 
     verify("lp_staking", GazeLPStaking) 
-    verify("btts_lib", BTTSLib) 
+    # verify("btts_lib", BTTSLib) 

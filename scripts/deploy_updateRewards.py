@@ -18,7 +18,7 @@ def main():
     gas_strategy = GasNowScalingStrategy("fast", increment=1.2)
     gas_price(gas_strategy)
 
-    # MONA Token
+    # GAZE Token
     access_control = deploy_access_control()
     gaze_token = get_gaze_token()
 
