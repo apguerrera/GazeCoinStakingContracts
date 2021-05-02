@@ -137,15 +137,18 @@ contract GazeLPStaking {
         public 
         payable
     {
-        uint256 startBal = IERC20(lpToken).balanceOf(address(this));
+        uint256 startLPBal = IERC20(lpToken).balanceOf(address(this));
+        uint256 startTokenBal = IERC20(rewardsToken).balanceOf(address(this));
+
         addLiquidityETHOnly(address(this));
-        uint256 endBal = IERC20(lpToken).balanceOf(address(this));
+        uint256 endLPBal = IERC20(lpToken).balanceOf(address(this));
+        uint256 endTokenBal = IERC20(rewardsToken).balanceOf(address(this));
 
         require(
-            endBal > startBal ,
+            endLPBal > startLPBal ,
             "GazeStaking.zapEth: Zap amount must be greater than 0"
         );
-        uint256 amount = endBal.sub(startBal);
+        uint256 amount = endLPBal.sub(startLPBal);
 
         Staker storage staker = stakers[msg.sender];
         if (staker.balance == 0 && staker.lastRewardPoints == 0 ) {
@@ -156,6 +159,11 @@ contract GazeLPStaking {
         staker.balance = staker.balance.add(amount);
         stakedLPTotal = uint128(uint256(stakedLPTotal).add(amount));
         emit Staked(msg.sender, amount);
+
+        uint256 refund = endTokenBal.sub(startTokenBal);
+        if (refund > 0) {
+            rewardsToken.safeTransfer(msg.sender, refund);
+        }
     }
 
 
